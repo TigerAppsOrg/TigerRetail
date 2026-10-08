@@ -1,7 +1,7 @@
 "use client";
 import { useState, type ReactNode } from "react";
-import type { Building, Dept, Filters, Recency, Section } from "./types";
-import { DEPTS, DEPT_COLOR, RECENCY, SECTIONS, tidyCollege } from "./logic/catalog";
+import type { Building, Filters, Recency, Section } from "./types";
+import { RECENCY, SECTIONS, tidyCollege } from "./logic/catalog";
 import s from "./campus-map.module.css";
 
 const toggle = <T,>(xs: T[], x: T) => (xs.includes(x) ? xs.filter((y) => y !== x) : [...xs, x]);
@@ -120,17 +120,6 @@ export function FilterPanel({ filters: f, onChange, buildings, sellersByCollege,
             ))}
           </SubGroup>
         ))}
-      </Group>
-
-      <Group title="Department" active={f.depts.length} onClear={() => set({ depts: [] })}>
-        <div className={s.chips}>
-          {DEPTS.map((d: Dept) => (
-            <button key={d} className={s.chip} aria-pressed={f.depts.includes(d)} onClick={() => set({ depts: toggle(f.depts, d) })}>
-              <i className={s.swatch} style={{ background: DEPT_COLOR[d] }} />
-              {d}
-            </button>
-          ))}
-        </div>
       </Group>
 
       <Group title="Where" active={f.colleges.length + f.buildings.length} onClear={() => set({ colleges: [], buildings: [] })}>

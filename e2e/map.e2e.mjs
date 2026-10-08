@@ -202,6 +202,22 @@ async function setListings(page, n) {
   check((await clearAll.count()) === 0, "Clear all filters goes away once nothing is filtered");
   check(/· 200 items/.test(await panel.textContent()), "map back to all 200 items");
 
+  // department filter lives in the map legend now, not the sidebar
+  check((await panel.getByRole("button", { name: /^Department/ }).count()) === 0, "sidebar has no Department section");
+  const legend = page.getByRole("group", { name: "Legend and department filter" });
+  const mens = legend.getByRole("button", { name: "men's", exact: true });
+  check((await mens.count()) === 1, "legend has department toggles at campus (heat) scale");
+  await mens.click();
+  await page.waitForTimeout(300);
+  check((await mens.getAttribute("aria-pressed")) === "true", "tapping men's in the legend turns it on");
+  const filtered = (await panel.locator("[class*=count]").first().textContent()).trim();
+  check(!/· 200 items/.test(filtered), `men's filter narrows the map (${filtered})`);
+  await page.waitForTimeout(300);
+  await shot(page, "21-legend-department-filter");
+  await legend.getByRole("button", { name: "all", exact: true }).click();
+  await page.waitForTimeout(300);
+  check((await mens.getAttribute("aria-pressed")) === "false" && /· 200 items/.test(await panel.textContent()), "legend 'all' clears the department filter");
+
   await page.close();
 }
 
