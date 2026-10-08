@@ -202,21 +202,24 @@ async function setListings(page, n) {
   check((await clearAll.count()) === 0, "Clear all filters goes away once nothing is filtered");
   check(/· 200 items/.test(await panel.textContent()), "map back to all 200 items");
 
-  // department filter lives in the map legend now, not the sidebar
-  check((await panel.getByRole("button", { name: /^Department/ }).count()) === 0, "sidebar has no Department section");
-  const legend = page.getByRole("group", { name: "Legend and department filter" });
-  const mens = legend.getByRole("button", { name: "men's", exact: true });
-  check((await mens.count()) === 1, "legend has department toggles at campus (heat) scale");
+  // gender filter is the first section of the sidebar; the map key is display-only
+  const firstSection = (await panel.locator("section").first().getByRole("button").first().textContent()).trim();
+  check(firstSection.startsWith("Gender"), `first sidebar section is Gender ("${firstSection}")`);
+  const mens = panel.getByRole("button", { name: "men's", exact: true });
   await mens.click();
   await page.waitForTimeout(300);
-  check((await mens.getAttribute("aria-pressed")) === "true", "tapping men's in the legend turns it on");
+  check((await mens.getAttribute("aria-pressed")) === "true", "tapping men's turns it on");
   const filtered = (await panel.locator("[class*=count]").first().textContent()).trim();
   check(!/· 200 items/.test(filtered), `men's filter narrows the map (${filtered})`);
+  const key = page.getByLabel("Map key");
+  check((await key.getByRole("button").count()) === 0, "map key has no buttons");
+  const kb = await key.boundingBox();
+  check(kb.height < 32, `map key is a single small line (${Math.round(kb.height)}px tall)`);
   await page.waitForTimeout(300);
-  await shot(page, "21-legend-department-filter");
-  await legend.getByRole("button", { name: "all", exact: true }).click();
+  await shot(page, "21-gender-filter-top");
+  await panel.getByRole("button", { name: "Clear all filters" }).click();
   await page.waitForTimeout(300);
-  check((await mens.getAttribute("aria-pressed")) === "false" && /· 200 items/.test(await panel.textContent()), "legend 'all' clears the department filter");
+  check((await mens.getAttribute("aria-pressed")) === "false", "Clear all turns gender off too");
 
   await page.close();
 }
