@@ -9,9 +9,9 @@ import { DEPTS, DEPT_COLOR } from "./logic/catalog";
 export const heatRenderer = () =>
   new HeatmapRenderer({
     field: "count",
-    radius: 26,
+    radius: 30,
     minDensity: 0,
-    maxDensity: 0.25,
+    maxDensity: 0.06,
     colorStops: [
       { ratio: 0, color: "rgba(223, 90, 30, 0)" },
       { ratio: 0.15, color: "rgba(242, 140, 80, 0.35)" },
