@@ -7,15 +7,15 @@
    Click a seller → their gallery pops out beside the pin; the map stays put. */
 import "@arcgis/core/assets/esri/themes/light/main.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type Point from "@arcgis/core/geometry/Point";
 import type MapView from "@arcgis/core/views/MapView";
+import ArcPoint from "@arcgis/core/geometry/Point";
 import type { Building, Filters, Listing, Seller } from "./types";
 import { emptyFilters, hasItemFilter } from "./logic/filters";
 import { buildSellerPins } from "./logic/pins";
-import { HEAT_ABOVE_SCALE, PHOTOS_BELOW_SCALE } from "./logic/viewMode";
+import { CLUSTER_MAX_SCALE } from "./renderers";
 import { DEPTS, DEPT_COLOR, tidyCollege } from "./logic/catalog";
 import { fetchResidentialBuildings, solveWalkingRoute } from "./princeton";
-import { ignoreInterrupt, useCampusView } from "./useCampusView";
+import { ignoreInterrupt, useCampusView, type MapHit } from "./useCampusView";
 import { FilterPanel } from "./FilterPanel";
 import { PhotoPins } from "./PhotoPins";
 import { SellerGallery } from "./SellerGallery";
@@ -31,7 +31,8 @@ export interface CampusMapProps {
   onOpenSeller: (s: Seller) => void;
 }
 
-const ZOOM_IN_TO = (HEAT_ABOVE_SCALE + PHOTOS_BELOW_SCALE) / 2; // lands in dots mode
+const PANEL_RESERVE = 328; // the Nearby/Directions card + its margin, on wide screens
+const SELLER_SCALE = 4_000; // close enough that every seller is their own dot
 
 export default function CampusMap({ sellers, listings, acceptedSellerIds = [], onOpenListing, onOpenSeller }: CampusMapProps) {
   const mapEl = useRef<HTMLDivElement>(null);
@@ -86,13 +87,12 @@ export default function CampusMap({ sellers, listings, acceptedSellerIds = [], o
   const selectedPin = pins.find((p) => p.seller.id === selectedId) ?? null;
   const itemFilter = hasItemFilter(filters);
 
-  const onMapClick = useCallback((view: MapView, sellerId: string | null, mapPoint: Point | null) => {
-    if (mapPoint) {
-      // heat mode: clicking means "show me what's here"
-      view.goTo({ target: mapPoint, scale: ZOOM_IN_TO }).catch(ignoreInterrupt);
+  const onMapClick = useCallback((view: MapView, hit: MapHit) => {
+    if (hit.kind === "zoom") {
+      view.goTo({ target: hit.point, scale: hit.scale }).catch(ignoreInterrupt);
       return;
     }
-    setSelectedId(sellerId);
+    setSelectedId(hit.kind === "seller" ? hit.sellerId : null);
   }, []);
 
   const walking = route.status === "done" ? route.route : null;
@@ -127,9 +127,15 @@ export default function CampusMap({ sellers, listings, acceptedSellerIds = [], o
     const p = pins.find((x) => x.seller.id === id);
     if (!p || !cv.view) return;
     setSelectedId(id);
-    if (cv.view.scale > HEAT_ABOVE_SCALE) {
-      cv.view.goTo({ center: [p.lon, p.lat], scale: ZOOM_IN_TO }).catch(ignoreInterrupt);
-    }
+    // Picking from the list is navigation, so here the map may move: zoom in
+    // far enough to see the seller's own dot, and bring them into view if the
+    // list picked someone off-screen.
+    const view = cv.view;
+    const sp = view.toScreen(new ArcPoint({ longitude: p.lon, latitude: p.lat }));
+    const usableW = view.width - (panel.open && window.innerWidth > 820 ? PANEL_RESERVE : 0);
+    const onScreen = sp && sp.x > 40 && sp.x < usableW - 40 && sp.y > 40 && sp.y < view.height - 40;
+    if (view.scale > CLUSTER_MAX_SCALE) view.goTo({ center: [p.lon, p.lat], scale: SELLER_SCALE }).catch(ignoreInterrupt);
+    else if (!onScreen) view.goTo({ center: [p.lon, p.lat] }).catch(ignoreInterrupt);
   };
 
   const itemCount = pins.reduce((a, p) => a + p.listings.length, 0);
@@ -210,6 +216,7 @@ export default function CampusMap({ sellers, listings, acceptedSellerIds = [], o
                 totalListings={totalBySeller.get(selected.seller.id) ?? selected.listings.length}
                 filtered={selected.listings.length < (totalBySeller.get(selected.seller.id) ?? 0)}
                 directionsUnlocked={acceptedSellerIds.includes(selected.seller.id)}
+                reserveRight={panel.open ? PANEL_RESERVE : 0}
                 onClose={() => setSelectedId(null)}
                 onWalk={() => {
                   setTo(selected.building.name);

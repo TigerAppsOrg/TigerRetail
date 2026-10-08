@@ -3,9 +3,11 @@ import { DEPTS } from "./catalog";
 import { matchesListing, matchesLocation } from "./filters";
 import { haversineMeters, offsetMeters } from "./geo";
 
-/* Sellers sharing a building sit on a small ring around it, so their dots
-   don't land exactly on top of each other. */
-const RING_METERS = 9;
+/* Sellers sharing a building are laid out on a sunflower (Vogel) spiral
+   around it: r = c·√i, θ = i·137.5°. Every point gets the same area, so
+   neighbours stay ~1.8c apart however many sellers a building has. */
+const SPIRAL_C = 8; // metres
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 function dominantDept(listings: Listing[]): Dept {
   const n = new Map<Dept, number>();
@@ -49,14 +51,8 @@ export function buildSellerPins(
     const building = buildings.get(name)!;
     group.sort((a, b) => a.seller.id.localeCompare(b.seller.id));
     group.forEach(({ seller, listings }, i) => {
-      const at =
-        group.length === 1
-          ? building
-          : offsetMeters(
-              building,
-              RING_METERS * Math.cos((2 * Math.PI * i) / group.length),
-              RING_METERS * Math.sin((2 * Math.PI * i) / group.length),
-            );
+      const r = SPIRAL_C * Math.sqrt(i + 0.5);
+      const at = group.length === 1 ? building : offsetMeters(building, r * Math.cos(i * GOLDEN_ANGLE), r * Math.sin(i * GOLDEN_ANGLE));
       pins.push({ seller, building, lon: at.lon, lat: at.lat, listings, dept: dominantDept(listings) });
     });
   }

@@ -5,8 +5,8 @@ import { useMemo } from "react";
 import CampusMap from "@/components/campus-map/CampusMap";
 import { demoMarketplace } from "@/fixtures/demoMarketplace";
 
-export default function DemoMap({ say }: { say: (msg: string) => void }) {
-  const data = useMemo(() => demoMarketplace(), []);
+export default function DemoMap({ count, say }: { count: number; say: (msg: string) => void }) {
+  const data = useMemo(() => demoMarketplace(new Date(), count), [count]);
   return (
     <CampusMap
       sellers={data.sellers}
