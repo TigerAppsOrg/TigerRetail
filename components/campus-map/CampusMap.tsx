@@ -9,7 +9,7 @@ import "@arcgis/core/assets/esri/themes/light/main.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type MapView from "@arcgis/core/views/MapView";
 import ArcPoint from "@arcgis/core/geometry/Point";
-import type { Building, Filters, Listing, Seller } from "./types";
+import type { Building, Dept, Filters, Listing, Seller } from "./types";
 import { emptyFilters, hasItemFilter } from "./logic/filters";
 import { buildSellerPins } from "./logic/pins";
 import { CLUSTER_MAX_SCALE } from "./renderers";
@@ -146,14 +146,18 @@ export default function CampusMap({ sellers, listings, acceptedSellerIds = [], o
   const error =
     cv.error ?? (buildingsError && `Couldn't load Princeton's dorm buildings: ${buildingsError}`) ?? (photoError && `Couldn't draw photo pins: ${photoError}`);
 
+  const changeFilters = (f: Filters) => {
+    setFilters(f);
+    setSelectedId(null); // a new search starts with the map, not an old gallery
+  };
+  const toggleDept = (d: Dept) =>
+    changeFilters({ ...filters, depts: filters.depts.includes(d) ? filters.depts.filter((x) => x !== d) : [...filters.depts, d] });
+
   return (
     <div className={s.root}>
       <FilterPanel
         filters={filters}
-        onChange={(f) => {
-          setFilters(f);
-          setSelectedId(null); // a new search starts with the map, not an old gallery
-        }}
+        onChange={changeFilters}
         buildings={buildings ?? []}
         sellersByCollege={sellersByCollege}
         sellerCount={pins.length}
@@ -267,7 +271,27 @@ export default function CampusMap({ sellers, listings, acceptedSellerIds = [], o
         )}
 
         {cv.ready && (
-          <div className={s.legend} aria-label="Legend">
+          <div className={s.legend} role="group" aria-label="Legend and department filter">
+            {/* the colour key is also the department filter: tap a colour to show only it */}
+            <div className={s.legrow}>
+              {DEPTS.map((d) => (
+                <button
+                  key={d}
+                  className={s.legchip}
+                  aria-pressed={filters.depts.includes(d)}
+                  data-dim={filters.depts.length > 0 && !filters.depts.includes(d)}
+                  onClick={() => toggleDept(d)}
+                >
+                  <i className={s.swatch} style={{ background: DEPT_COLOR[d] }} />
+                  {d}
+                </button>
+              ))}
+              {filters.depts.length > 0 && (
+                <button className={s.clear} onClick={() => changeFilters({ ...filters, depts: [] })}>
+                  all
+                </button>
+              )}
+            </div>
             {mode === "heat" ? (
               <div className={s.legrow}>
                 <span>fewer</span>
@@ -276,14 +300,6 @@ export default function CampusMap({ sellers, listings, acceptedSellerIds = [], o
               </div>
             ) : (
               <>
-                <div className={s.legrow}>
-                  {DEPTS.map((d) => (
-                    <span key={d}>
-                      <i className={s.swatch} style={{ background: DEPT_COLOR[d] }} />
-                      {d}
-                    </span>
-                  ))}
-                </div>
                 <div className={s.legrow} style={{ flexWrap: "nowrap" }}>
                   <PieSwatch depts={DEPTS} size={20} />
                   <span>split dot = sells in several; gray is always on the left</span>
