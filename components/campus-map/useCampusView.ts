@@ -19,6 +19,10 @@ import type { WalkingRoute } from "./princeton";
    positions, restrooms, construction impacts etc. are noise for shopping. */
 const KEEP_LAYERS = new Set(["Buildings"]);
 
+/* Opens on the residential part of campus, zoomed out far enough for heat. */
+const CAMPUS_CENTER: [number, number] = [-74.6565, 40.3448];
+const START_SCALE = 16_000;
+
 /* goTo() rejects when the user grabs the map mid-animation. That's expected;
    anything else is a real failure and gets reported. */
 export function ignoreInterrupt(e: unknown) {
@@ -48,69 +52,96 @@ export function useCampusView(
   const layers = useRef<{ sellers: FeatureLayer; overlay: GraphicsLayer; route: GraphicsLayer } | null>(null);
   const edits = useRef<Promise<unknown>>(Promise.resolve());
   // In heat mode a click zooms in; otherwise it picks the seller under the cursor.
-  const handleClick = useEffectEvent(async (view: MapView, sellers: FeatureLayer, e: { mapPoint: Point } & Parameters<MapView["hitTest"]>[0]) => {
-    if (mode === "heat") return onMapClick(view, null, e.mapPoint);
-    const hit = await view.hitTest(e, { include: [sellers] });
-    const g = hit.results.find((r) => r.type === "graphic");
-    onMapClick(view, g && "graphic" in g ? (g.graphic.attributes.sellerId as string) : null, null);
-  });
+  const handleClick = useEffectEvent(
+    async (view: MapView, sellers: FeatureLayer, e: { mapPoint: Point } & Parameters<MapView["hitTest"]>[0]) => {
+      if (mode === "heat") return onMapClick(view, null, e.mapPoint);
+      const hit = await view.hitTest(e, { include: [sellers] });
+      const g = hit.results.find((r) => r.type === "graphic");
+      onMapClick(view, g && "graphic" in g ? (g.graphic.attributes.sellerId as string) : null, null);
+    },
+  );
 
   // ---- create the view once ----
   useEffect(() => {
     if (!container.current) return;
-    const map = new WebMap({ portalItem: { id: CAMPUS_WEBMAP_ID } });
-    const sellers = new FeatureLayer({
-      title: "TigerRetail sellers",
-      source: [],
-      objectIdField: "ObjectID",
-      geometryType: "point",
-      spatialReference: { wkid: 4326 },
-      fields: [
-        { name: "ObjectID", type: "oid" },
-        { name: "sellerId", type: "string" },
-        { name: "count", type: "integer" },
-        { name: "dept", type: "string" },
-      ],
-      outFields: ["*"],
-      renderer: heatRenderer(),
-      popupEnabled: false,
-    });
-    const route = new GraphicsLayer({ title: "route" });
-    const overlay = new GraphicsLayer({ title: "selection" });
-    const view = new MapView({ container: container.current, map, popupEnabled: false, constraints: { rotationEnabled: false } });
-    layers.current = { sellers, overlay, route };
-
-    let raf = 0;
-    const bump = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => setState((s) => ({ ...s, frame: s.frame + 1, scale: view.scale })));
-    };
-
-    const handles: { remove(): void }[] = [];
-    map
-      .loadAll()
-      .then(() => {
-        map.layers.forEach((l) => {
-          l.visible = KEEP_LAYERS.has(l.title ?? "");
-          if ("popupEnabled" in l) (l as FeatureLayer).popupEnabled = false;
-        });
-        map.addMany([route, sellers, overlay]);
-        return view.when();
-      })
-      .then(() => {
-        setState((s) => ({ ...s, view, ready: true, scale: view.scale }));
-        handles.push(reactiveUtils.watch(() => [view.extent, view.size], bump));
-        handles.push(view.on("click", (e) => void handleClick(view, sellers, e)));
-      })
-      .catch((e: unknown) => {
-        setState((s) => ({ ...s, error: `Couldn't load Princeton's campus map: ${e instanceof Error ? e.message : String(e)}` }));
+    const el = container.current;
+    let teardown = () => {};
+    // Start on the next tick: React's StrictMode mount/unmount/mount then never
+    // builds (and aborts) a throwaway view.
+    const start = setTimeout(() => {
+      const map = new WebMap({ portalItem: { id: CAMPUS_WEBMAP_ID } });
+      const sellers = new FeatureLayer({
+        title: "TigerRetail sellers",
+        source: [],
+        objectIdField: "ObjectID",
+        geometryType: "point",
+        spatialReference: { wkid: 4326 },
+        fields: [
+          { name: "ObjectID", type: "oid" },
+          { name: "sellerId", type: "string" },
+          { name: "count", type: "integer" },
+          { name: "dept", type: "string" },
+        ],
+        outFields: ["*"],
+        renderer: heatRenderer(),
+        popupEnabled: false,
       });
+      const route = new GraphicsLayer({ title: "route" });
+      const overlay = new GraphicsLayer({ title: "selection" });
+      const view = new MapView({
+        container: el,
+        map,
+        center: CAMPUS_CENTER,
+        scale: START_SCALE,
+        popupEnabled: false,
+        constraints: { rotationEnabled: false },
+      });
+      view.ui.move("zoom", "bottom-right");
+      layers.current = { sellers, overlay, route };
 
+      let raf = 0;
+      const bump = () => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => setState((s) => ({ ...s, frame: s.frame + 1, scale: view.scale })));
+      };
+
+      const handles: { remove(): void }[] = [];
+      // React may unmount before loading finishes (StrictMode does it on purpose);
+      // a destroyed view's pending promises reject, and that's not a load failure.
+      let disposed = false;
+      map
+        .loadAll()
+        .then(() => {
+          if (disposed) return;
+          map.layers.forEach((l) => {
+            l.visible = KEEP_LAYERS.has(l.title ?? "");
+            if ("popupEnabled" in l) (l as FeatureLayer).popupEnabled = false;
+          });
+          map.addMany([route, sellers, overlay]);
+          return view.when();
+        })
+        .then(() => {
+          if (disposed) return;
+          setState((s) => ({ ...s, view, ready: true, scale: view.scale }));
+          handles.push(reactiveUtils.watch(() => [view.extent, view.size], bump));
+          handles.push(view.on("click", (e) => void handleClick(view, sellers, e)));
+        })
+        .catch((e: unknown) => {
+          if (disposed) return;
+          setState((s) => ({ ...s, error: `Couldn't load Princeton's campus map: ${e instanceof Error ? e.message : String(e)}` }));
+        });
+
+      teardown = () => {
+        disposed = true;
+        cancelAnimationFrame(raf);
+        handles.forEach((h) => h.remove());
+        view.destroy();
+        layers.current = null;
+      };
+    }, 0);
     return () => {
-      cancelAnimationFrame(raf);
-      handles.forEach((h) => h.remove());
-      view.destroy();
-      layers.current = null;
+      clearTimeout(start);
+      teardown();
     };
   }, [container]);
 
@@ -128,7 +159,12 @@ export function useCampusView(
     // serialise edits so a fast run of filter clicks can't interleave
     edits.current = edits.current
       .then(() => l.sellers.queryObjectIds())
-      .then((ids) => l.sellers.applyEdits({ deleteFeatures: ids.map((id) => ({ objectId: Number(id) })) /* client-side layer: oids are numbers */, addFeatures: adds }))
+      .then((ids) =>
+        l.sellers.applyEdits({
+          deleteFeatures: ids.map((id) => ({ objectId: Number(id) })) /* client-side layer: oids are numbers */,
+          addFeatures: adds,
+        }),
+      )
       .catch((e: unknown) => setState((s) => ({ ...s, error: `Couldn't draw sellers: ${e instanceof Error ? e.message : String(e)}` })));
   }, [pins, state.ready]);
 
@@ -162,7 +198,10 @@ export function useCampusView(
     if (!walkingRoute) return;
     l.route.addMany([
       new Graphic({ geometry: walkingRoute.path, symbol: { type: "simple-line", color: "white", width: 9, cap: "round", join: "round" } }),
-      new Graphic({ geometry: walkingRoute.path, symbol: { type: "simple-line", color: "#BB4C19", width: 5, cap: "round", join: "round" } }),
+      new Graphic({
+        geometry: walkingRoute.path,
+        symbol: { type: "simple-line", color: "#BB4C19", width: 5, cap: "round", join: "round" },
+      }),
     ]);
   }, [walkingRoute, state.ready]);
 

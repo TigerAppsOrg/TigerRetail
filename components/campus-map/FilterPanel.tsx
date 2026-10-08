@@ -13,9 +13,10 @@ interface Props {
   sellerCount: number;
   itemCount: number;
   open: boolean;
+  onClose: () => void;
 }
 
-export function FilterPanel({ filters: f, onChange, buildings, sellersByCollege, sellerCount, itemCount, open }: Props) {
+export function FilterPanel({ filters: f, onChange, buildings, sellersByCollege, sellerCount, itemCount, open, onClose }: Props) {
   const set = (patch: Partial<Filters>) => onChange({ ...f, ...patch });
 
   const toggleSection = (sec: Section) => {
@@ -40,6 +41,11 @@ export function FilterPanel({ filters: f, onChange, buildings, sellersByCollege,
         <span className={s.count}>
           {sellerCount} sellers · {itemCount} items
         </span>
+        <button className={s.fclose} onClick={onClose} aria-label="Close filters">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
       </div>
 
       <div className={s.grp}>

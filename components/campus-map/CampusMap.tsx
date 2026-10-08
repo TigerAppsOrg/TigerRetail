@@ -148,13 +148,15 @@ export default function CampusMap({ sellers, listings, acceptedSellerIds = [], o
         sellerCount={pins.length}
         itemCount={itemCount}
         open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
       />
+      {filtersOpen && <div className={s.fveil} onClick={() => setFiltersOpen(false)} aria-hidden />}
 
       <div className={s.stage}>
         <div ref={mapEl} className={s.map} />
 
-        <button className={s.fbtn} onClick={() => setFiltersOpen((o) => !o)} aria-expanded={filtersOpen}>
-          {filtersOpen ? "Close filters" : "Filters"}
+        <button className={s.fbtn} onClick={() => setFiltersOpen(true)} aria-expanded={filtersOpen}>
+          Filters
         </button>
 
         {error ? (
