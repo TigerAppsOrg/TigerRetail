@@ -81,38 +81,49 @@ const subsOf = new Map(SECTIONS);
 /* Each seller leans one way, so dot colours mean something. */
 const LEAN: Dept[] = ["women's", "women's", "men's", "men's", "unisex", "misc"];
 
-export function demoMarketplace(now = new Date()): { sellers: Seller[]; listings: Listing[] } {
+/* Buildings drawn in proportion to their HOMES weight. */
+const HOME_POOL = HOMES.flatMap(([b, w]) => Array<string>(w).fill(b));
+
+export const DEFAULT_LISTINGS = 200;
+
+/* Exactly `listingCount` listings; the number of sellers grows with it
+   (~4.5 items each), spread over the same dorms, so 1000 listings is a
+   genuinely crowded campus rather than the same sellers with more stuff. */
+export function demoMarketplace(
+  now = new Date(),
+  listingCount = DEFAULT_LISTINGS,
+): { sellers: Seller[]; listings: Listing[] } {
   rnd = mulberry32(20261007); // same data on every call, StrictMode double-renders included
   const sellers: Seller[] = [];
   const listings: Listing[] = [];
-  let n = 0;
-  for (const [building, count] of HOMES) {
-    for (let i = 0; i < count; i++) {
-      const first = FIRST[n % FIRST.length];
-      const id = `${first.slice(0, 2)}${1000 + Math.floor(rnd() * 9000)}`;
-      sellers.push({ id, name: first[0].toUpperCase() + first.slice(1), building, roomDirections: pick(DIRECTIONS) });
-      const lean = pick(LEAN);
-      // a few seniors clearing out a whole room, most selling a handful
-      const items = rnd() < 0.15 ? 8 + Math.floor(rnd() * 7) : 1 + Math.floor(rnd() * 5);
-      for (let k = 0; k < items; k++) {
-        const section = lean === "misc" && rnd() < 0.7 ? pick(["dorm", "school supplies", "everything else"] as Section[]) : weightedSection();
-        const sub = pick(subsOf.get(section)!);
-        const dept: Dept = !APPAREL.has(section) ? "misc" : rnd() < 0.75 && lean !== "misc" ? lean : pick(["women's", "men's", "unisex"] as Dept[]);
-        const title = pick(TITLES[sub]);
-        const ageDays = rnd() < 0.5 ? rnd() * 7 : rnd() * 40;
-        listings.push({
-          id: `${id}-${k}`,
-          sellerId: id,
-          title,
-          price: 5 + Math.round(rnd() * 11) * 5,
-          section,
-          sub,
-          dept,
-          imageUrl: itemPhoto(title, section, n * 31 + k),
-          postedAt: new Date(now.getTime() - ageDays * 86_400_000).toISOString(),
-        });
-      }
-      n++;
+  for (let n = 0; listings.length < listingCount; n++) {
+    // first pass covers every home once, so even small counts spread across campus
+    const building = n < HOMES.length ? HOMES[n][0] : pick(HOME_POOL);
+    const first = FIRST[n % FIRST.length];
+    // 37 is coprime with 9000, so ids stay unique for the first 9000 sellers
+    const id = `${first.slice(0, 2)}${1000 + ((n * 37) % 9000)}`;
+    sellers.push({ id, name: first[0].toUpperCase() + first.slice(1), building, roomDirections: pick(DIRECTIONS) });
+    const lean = pick(LEAN);
+    // a few seniors clearing out a whole room, most selling a handful
+    const wanted = rnd() < 0.15 ? 8 + Math.floor(rnd() * 7) : 1 + Math.floor(rnd() * 5);
+    const items = Math.min(wanted, listingCount - listings.length);
+    for (let k = 0; k < items; k++) {
+      const section = lean === "misc" && rnd() < 0.7 ? pick(["dorm", "school supplies", "everything else"] as Section[]) : weightedSection();
+      const sub = pick(subsOf.get(section)!);
+      const dept: Dept = !APPAREL.has(section) ? "misc" : rnd() < 0.75 && lean !== "misc" ? lean : pick(["women's", "men's", "unisex"] as Dept[]);
+      const title = pick(TITLES[sub]);
+      const ageDays = rnd() < 0.5 ? rnd() * 7 : rnd() * 40;
+      listings.push({
+        id: `${id}-${k}`,
+        sellerId: id,
+        title,
+        price: 5 + Math.round(rnd() * 11) * 5,
+        section,
+        sub,
+        dept,
+        imageUrl: itemPhoto(title, section, n * 31 + k),
+        postedAt: new Date(now.getTime() - ageDays * 86_400_000).toISOString(),
+      });
     }
   }
   return { sellers, listings };

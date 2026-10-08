@@ -33,32 +33,61 @@ async function open(viewport) {
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
   page.on("console", (m) => m.type() === "error" && errors.push(`console: ${m.text()}`));
   await page.goto(URL);
-  await page.getByRole("status").filter({ hasText: "across campus" }).waitFor({ timeout: 30_000 });
+  await page.locator("[class*=banner]").filter({ hasText: "across campus" }).waitFor({ timeout: 30_000 });
   await page.waitForTimeout(2500); // let tiles finish drawing
   return page;
 }
 
-/* zoom one level in, centred on the map stage (the map opens on the dorms) */
+/* zoom one level at a time with the map's own + button (double-clicking would
+   also click whatever cluster is under the cursor) */
 async function zoomIn(page, times = 1) {
-  const box = await page.locator("[class*=stage]").first().boundingBox();
   for (let i = 0; i < times; i++) {
-    await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
-    await page.waitForTimeout(1200);
+    await page.locator('calcite-button[title="Zoom in"]').click();
+    await page.waitForTimeout(1300);
   }
-  await page.waitForTimeout(1500);
+  await page.waitForTimeout(1200);
+}
+async function zoomOut(page, times = 1) {
+  for (let i = 0; i < times; i++) {
+    await page.locator('calcite-button[title="Zoom out"]').click();
+    await page.waitForTimeout(1300);
+  }
+  await page.waitForTimeout(1200);
+}
+
+/* every pair of visible photo frames must not overlap */
+async function framesOverlap(page) {
+  const boxes = await page.locator("[class*=pinframe]").evaluateAll((els) =>
+    els.map((e) => e.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, w: r.width, h: r.height })),
+  );
+  let hits = 0;
+  for (let i = 0; i < boxes.length; i++)
+    for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], b = boxes[j];
+      if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) hits++;
+    }
+  return { frames: boxes.length, hits };
+}
+
+/* drag the stress slider and wait until the map reports that many items */
+async function setListings(page, n) {
+  const t0 = Date.now();
+  await page.getByLabel("Demo listings").fill(String(n));
+  await page.locator("aside[aria-label='Map filters']").getByText(new RegExp(`· ${n} items`)).waitFor({ timeout: 15_000 });
+  return Date.now() - t0;
 }
 
 // ---------------- desktop ----------------
 {
   const page = await open({ width: 1440, height: 900 });
 
-  const banner = await page.getByRole("status").first().textContent();
+  const banner = await page.locator("[class*=banner]").textContent();
   check(/\d+ items across campus/.test(banner), `heat view banner: "${banner.trim()}"`);
   check((await page.locator("[class*=pinframe]").count()) === 0, "no photo pins at campus scale");
   await shot(page, "01-heatmap-campus");
 
   await zoomIn(page, 2);
-  const banner2 = await page.getByRole("status").first().textContent();
+  const banner2 = await page.locator("[class*=banner]").textContent();
   check(/Filter by what you want/.test(banner2), `dots view banner: "${banner2.trim()}"`);
   check((await page.locator("[class*=pinframe]").count()) === 0, "still no photo pins without an item filter");
   await shot(page, "02-seller-dots");
@@ -85,6 +114,10 @@ async function zoomIn(page, times = 1) {
   check(/Room directions are shared once|Room directions:/.test(gtext), "gallery shows room-directions privacy state");
   const thumbs = await gallery.locator("img").count();
   check(thumbs > 1, `gallery shows the seller's items (${thumbs})`);
+  const panelBox = await page.getByLabel("Nearby and directions").boundingBox();
+  const gBox = await gallery.boundingBox();
+  check(gBox.x + gBox.width <= panelBox.x || gBox.y >= panelBox.y + panelBox.height, "gallery doesn't open underneath the side panel");
+  await page.waitForTimeout(400);
   await shot(page, "05-gallery-popout");
 
   await page.keyboard.press("Escape");
@@ -114,6 +147,42 @@ async function zoomIn(page, times = 1) {
   await page.close();
 }
 
+// ---------------- stress: 1000 and 50 listings ----------------
+{
+  const page = await open({ width: 1440, height: 900 });
+
+  const ms = await setListings(page, 1000);
+  check(ms < 5000, `1000 listings regenerate and redraw in ${ms} ms`);
+  await page.waitForTimeout(2000);
+  const b = await page.locator("[class*=banner]").textContent();
+  check(/1000 items across campus/.test(b), `heat banner counts all 1000: "${b.trim()}"`);
+  await shot(page, "12-stress-1000-heatmap");
+
+  await zoomIn(page, 1); // 1:8000 → clustered
+  await shot(page, "13-stress-1000-clusters");
+  await zoomIn(page, 1); // 1:4000 → every seller
+  await shot(page, "14-stress-1000-dots");
+
+  await page.getByRole("button", { name: "clothing", exact: true }).click();
+  await zoomIn(page, 1); // 1:2000 → photos
+  const o = await framesOverlap(page);
+  check(o.frames > 0 && o.hits === 0, `1000 listings, photo view: ${o.frames} frames, ${o.hits} overlapping`);
+  await shot(page, "15-stress-1000-photo-pins");
+
+  await page.getByRole("button", { name: "Clear all filters" }).click();
+  await zoomOut(page, 3);
+  const ms50 = await setListings(page, 50);
+  check(ms50 < 5000, `50 listings regenerate in ${ms50} ms`);
+  await page.waitForTimeout(2000);
+  const b50 = await page.locator("[class*=banner]").textContent();
+  check(/50 items across campus/.test(b50), `heat banner counts 50: "${b50.trim()}"`);
+  await shot(page, "16-stress-50-heatmap");
+  await zoomIn(page, 2);
+  await shot(page, "17-stress-50-dots");
+
+  await page.close();
+}
+
 // ---------------- phone ----------------
 {
   const page = await open({ width: 390, height: 844 });
@@ -137,7 +206,8 @@ async function zoomIn(page, times = 1) {
     const g = page.getByRole("dialog");
     await g.waitFor();
     const gb = await g.boundingBox();
-    check(gb.x >= 0 && gb.x + gb.width <= 390, "mobile: gallery fits the screen (bottom sheet)");
+    check(gb.x >= 0 && gb.x + gb.width <= 390 && gb.y + gb.height >= 844 - 20, "mobile: gallery is a bottom sheet");
+    await page.waitForTimeout(400);
     await shot(page, "11-mobile-gallery-sheet");
   }
   await page.close();

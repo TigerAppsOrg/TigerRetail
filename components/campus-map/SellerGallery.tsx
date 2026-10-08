@@ -14,6 +14,8 @@ interface Props {
   totalListings: number;
   filtered: boolean;
   directionsUnlocked: boolean;
+  /* px on the right taken by another card; the gallery won't open under it */
+  reserveRight: number;
   onClose: () => void;
   onWalk: () => void;
   onOpenListing: (l: Listing) => void;
@@ -34,7 +36,9 @@ export function SellerGallery(p: Props) {
   const point = useMemo(() => new Point({ longitude: p.pin.lon, latitude: p.pin.lat }), [p.pin]);
   void p.frame;
   const anchor = p.view.toScreen(point) ?? { x: -9999, y: -9999 };
-  const place = placePopover(anchor, { w: W, h }, { w: p.view.width, h: p.view.height });
+  // the side panel only sits on the right on wide screens (see .panel media query)
+  const reserve = typeof window !== "undefined" && window.innerWidth > 820 ? p.reserveRight : 0;
+  const place = placePopover(anchor, { w: W, h }, { w: p.view.width - reserve, h: p.view.height });
 
   const { seller, building, listings } = p.pin;
   const style = place.side === "sheet" ? undefined : { left: place.left, top: place.top };

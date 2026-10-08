@@ -118,6 +118,16 @@ describe("buildSellerPins", () => {
     const c = pins.find((p) => p.seller.id === "c")!;
     expect(haversineMeters(c, BFORBES)).toBeLessThan(0.01);
   });
+  it("keeps dots apart even when a whole building is selling (move-out week)", () => {
+    const crowd: Seller[] = Array.from({ length: 24 }, (_, i) => ({ id: `s${i}`, name: "", building: "1976 Hall", roomDirections: "" }));
+    const items = crowd.map((s, i) => L({ id: `l${i}`, sellerId: s.id }));
+    const { pins } = buildSellerPins(crowd, items, buildings, emptyFilters(), NOW);
+    let min = Infinity;
+    for (let i = 0; i < pins.length; i++)
+      for (let j = i + 1; j < pins.length; j++) min = Math.min(min, haversineMeters(pins[i], pins[j]));
+    expect(min).toBeGreaterThan(10); // ~10 px apart at 1:4000
+    expect(Math.max(...pins.map((p) => haversineMeters(p, B1976)))).toBeLessThan(50); // still on the building
+  });
   it("sortByDistance orders nearest first", () => {
     const { pins } = buildSellerPins(sellers, listings, buildings, emptyFilters(), NOW);
     const sorted = sortByDistance(pins, BFORBES);

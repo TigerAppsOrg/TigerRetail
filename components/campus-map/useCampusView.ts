@@ -6,13 +6,14 @@ import WebMap from "@arcgis/core/WebMap";
 import MapView from "@arcgis/core/views/MapView";
 import FeatureLayer from "@arcgis/core/layers/FeatureLayer";
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer";
+import MapImageLayer from "@arcgis/core/layers/MapImageLayer";
 import Graphic from "@arcgis/core/Graphic";
 import Point from "@arcgis/core/geometry/Point";
 import * as reactiveUtils from "@arcgis/core/core/reactiveUtils";
 import type { SellerPin, ViewMode } from "./types";
 import { viewMode } from "./logic/viewMode";
-import { CAMPUS_WEBMAP_ID } from "./princeton";
-import { dotsRenderer, heatRenderer } from "./renderers";
+import { CAMPUS_WEBMAP_ID, CLEAN_RENDER_SCALES, NEIGHBOURHOOD_LABELS, TIGERMAP_URL } from "./princeton";
+import { CLUSTER_MAX_SCALE, dotsRenderer, heatRenderer, sellerClusters } from "./renderers";
 import type { WalkingRoute } from "./princeton";
 
 /* Of everything in Princeton's web map, keep the building outlines. Bus
@@ -30,6 +31,11 @@ export function ignoreInterrupt(e: unknown) {
   console.error("[campus-map] goTo failed", e);
 }
 
+export type MapHit =
+  | { kind: "seller"; sellerId: string }
+  | { kind: "zoom"; point: Point; scale: number } // heat spot or cluster: go closer
+  | { kind: "empty" };
+
 export interface CampusView {
   view: MapView | null;
   mode: ViewMode;
@@ -45,21 +51,23 @@ export function useCampusView(
   itemFilter: boolean,
   selected: SellerPin | null,
   walkingRoute: WalkingRoute | null,
-  onMapClick: (view: MapView, sellerId: string | null, mapPoint: Point | null) => void,
+  onMapClick: (view: MapView, hit: MapHit) => void,
 ): CampusView {
   const [state, setState] = useState<Omit<CampusView, "mode">>({ view: null, ready: false, error: null, scale: 0, frame: 0 });
   const mode = viewMode(state.ready ? state.scale : Infinity, itemFilter);
   const layers = useRef<{ sellers: FeatureLayer; overlay: GraphicsLayer; route: GraphicsLayer } | null>(null);
   const edits = useRef<Promise<unknown>>(Promise.resolve());
-  // In heat mode a click zooms in; otherwise it picks the seller under the cursor.
-  const handleClick = useEffectEvent(
-    async (view: MapView, sellers: FeatureLayer, e: { mapPoint: Point } & Parameters<MapView["hitTest"]>[0]) => {
-      if (mode === "heat") return onMapClick(view, null, e.mapPoint);
-      const hit = await view.hitTest(e, { include: [sellers] });
-      const g = hit.results.find((r) => r.type === "graphic");
-      onMapClick(view, g && "graphic" in g ? (g.graphic.attributes.sellerId as string) : null, null);
-    },
-  );
+  // In heat mode a click zooms in; a cluster zooms in until it splits;
+  // otherwise it picks the seller under the cursor.
+  const handleClick = useEffectEvent(async (view: MapView, sellers: FeatureLayer, e: { mapPoint: Point } & Parameters<MapView["hitTest"]>[0]) => {
+    if (mode === "heat") return onMapClick(view, { kind: "zoom", point: e.mapPoint, scale: 8_000 });
+    const hit = await view.hitTest(e, { include: [sellers] });
+    const r = hit.results.find((x) => x.type === "graphic");
+    const g = r && "graphic" in r ? r.graphic : null;
+    if (!g) return onMapClick(view, { kind: "empty" });
+    if (g.isAggregate) return onMapClick(view, { kind: "zoom", point: g.geometry as Point, scale: 4_000 });
+    onMapClick(view, { kind: "seller", sellerId: g.attributes.sellerId as string });
+  });
 
   // ---- create the view once ----
   useEffect(() => {
@@ -83,7 +91,7 @@ export function useCampusView(
           { name: "dept", type: "string" },
         ],
         outFields: ["*"],
-        renderer: heatRenderer(),
+        renderer: heatRenderer(0),
         popupEnabled: false,
       });
       const route = new GraphicsLayer({ title: "route" });
@@ -118,6 +126,25 @@ export function useCampusView(
             if ("popupEnabled" in l) (l as FeatureLayer).popupEnabled = false;
           });
           map.addMany([route, sellers, overlay]);
+          // Same Princeton basemap, rendered on request without the faded
+          // neighbourhood watermarks, drawn over the cached tiles only at the
+          // zoom levels that have them. It's a nicety: if it fails the map
+          // still works, but the failure is reported, not hidden.
+          const clean = new MapImageLayer({ url: TIGERMAP_URL, title: "basemap without faded labels", ...CLEAN_RENDER_SCALES });
+          clean
+            .load()
+            .then(() => {
+              for (const id of [NEIGHBOURHOOD_LABELS.fadedGroup, NEIGHBOURHOOD_LABELS.fadedClose]) {
+                const sub = clean.findSublayerById(id);
+                if (!sub) throw new Error(`Princeton's basemap no longer has label sublayer ${id}`);
+                sub.visible = false;
+              }
+              if (!disposed) map.add(clean, 0); // above the basemap, below buildings and sellers
+            })
+            .catch((e: unknown) => {
+              if (disposed) return;
+              setState((s) => ({ ...s, error: `Couldn't hide the faded neighbourhood labels: ${e instanceof Error ? e.message : String(e)}` }));
+            });
           return view.when();
         })
         .then(() => {
@@ -168,12 +195,22 @@ export function useCampusView(
       .catch((e: unknown) => setState((s) => ({ ...s, error: `Couldn't draw sellers: ${e instanceof Error ? e.message : String(e)}` })));
   }, [pins, state.ready]);
 
-  // ---- heat vs dots ----
+  // ---- heat vs dots (clustered at neighbourhood zoom) ----
+  // Clustering is switched on/off here by scale rather than with the cluster's
+  // own maxScale: past maxScale, ArcGIS 5.1 left most individual dots undrawn.
+  const itemsShown = pins.reduce((a, p) => a + p.listings.length, 0);
+  const clustered = mode !== "heat" && state.scale > CLUSTER_MAX_SCALE;
   useEffect(() => {
     const l = layers.current;
     if (!l || !state.ready) return;
-    l.sellers.renderer = mode === "heat" ? heatRenderer() : dotsRenderer();
-  }, [mode, state.ready]);
+    if (mode === "heat") {
+      l.sellers.featureReduction = null; // clustering and heatmaps don't mix
+      l.sellers.renderer = heatRenderer(itemsShown);
+    } else {
+      l.sellers.renderer = dotsRenderer();
+      l.sellers.featureReduction = clustered ? sellerClusters() : null;
+    }
+  }, [mode, clustered, itemsShown, state.ready]);
 
   // ---- ring around the selected seller ----
   useEffect(() => {

@@ -13,6 +13,23 @@ import { polygonCentroid } from "./logic/geo";
    interactive campus map, with the TigermapPRD basemap. */
 export const CAMPUS_WEBMAP_ID = "9f7ccf267b5b4037aac0332332e7d2e4";
 
+/* The basemap behind that web map. Served as cached PNG tiles (labels baked
+   in), but the same service can also render on request with chosen label
+   groups switched off. */
+export const TIGERMAP_URL = "https://facgisprd.princeton.edu/server/rest/services/Basemap/TigermapPRD/MapServer";
+
+/* Neighbourhood names ("THE ELLIPSE", "MUSEUM"). Zoomed all the way out they're
+   bold and useful; at 1:4000-1:10000 they turn into huge faded watermarks over
+   the dots. Keep the first, drop the second. */
+export const NEIGHBOURHOOD_LABELS = {
+  keep: 42, // NeighborhoodsLabels15000_Anno, 1:10k-20k
+  fadedGroup: 144, // NeighborhoodsLabels7500_Anno, 1:5k-10k
+  fadedClose: 148, // NeighborhoodsLabels15000_Anno, 1:4k-10k
+};
+/* Only these zoom levels show the faded labels, so only they need the
+   slower on-request rendering. */
+export const CLEAN_RENDER_SCALES = { minScale: 9_000, maxScale: 3_000 };
+
 const BUILDINGS_URL = "https://facgisprd.princeton.edu/server/rest/services/Building/Buildings/MapServer/0";
 const ROUTE_URL = "https://facgisprd.princeton.edu/routing/rest/services/Routing/NetworkAnalysis/NAServer/Route";
 

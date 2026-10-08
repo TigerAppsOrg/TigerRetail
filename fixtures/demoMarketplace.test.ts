@@ -14,6 +14,15 @@ describe("demoMarketplace", () => {
     const ids = new Set(sellers.map((s) => s.id));
     expect(listings.every((l) => ids.has(l.sellerId))).toBe(true);
   });
+  it.each([50, 200, 1000])("makes exactly %i listings with unique ids", (n) => {
+    const { sellers, listings } = demoMarketplace(new Date(), n);
+    expect(listings).toHaveLength(n);
+    expect(new Set(sellers.map((s) => s.id)).size).toBe(sellers.length);
+    expect(new Set(listings.map((l) => l.id)).size).toBe(n);
+  });
+  it("more listings means more sellers, not just bigger ones", () => {
+    expect(demoMarketplace(new Date(), 1000).sellers.length).toBeGreaterThan(4 * demoMarketplace(new Date(), 200).sellers.length - 20);
+  });
   it("only uses real sections and subs, with titles for each", () => {
     const subs = new Map(SECTIONS);
     for (const l of demoMarketplace().listings) {
