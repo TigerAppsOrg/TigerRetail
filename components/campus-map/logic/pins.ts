@@ -9,12 +9,7 @@ import { haversineMeters, offsetMeters } from "./geo";
 const SPIRAL_C = 8; // metres
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
-function dominantDept(listings: Listing[]): Dept {
-  const n = new Map<Dept, number>();
-  for (const l of listings) n.set(l.dept, (n.get(l.dept) ?? 0) + 1);
-  // ties break in DEPTS order so colours are stable
-  return DEPTS.reduce((best, d) => ((n.get(d) ?? 0) > (n.get(best) ?? 0) ? d : best), DEPTS[0]);
-}
+const deptsOf = (listings: Listing[]): Dept[] => DEPTS.filter((d) => listings.some((l) => l.dept === d));
 
 export function buildSellerPins(
   sellers: Seller[],
@@ -53,7 +48,7 @@ export function buildSellerPins(
     group.forEach(({ seller, listings }, i) => {
       const r = SPIRAL_C * Math.sqrt(i + 0.5);
       const at = group.length === 1 ? building : offsetMeters(building, r * Math.cos(i * GOLDEN_ANGLE), r * Math.sin(i * GOLDEN_ANGLE));
-      pins.push({ seller, building, lon: at.lon, lat: at.lat, listings, dept: dominantDept(listings) });
+      pins.push({ seller, building, lon: at.lon, lat: at.lat, listings, depts: deptsOf(listings) });
     });
   }
   return { pins, unresolved };

@@ -9,9 +9,9 @@ export type Section =
   | "school supplies"
   | "everything else";
 
-/* Apparel listings carry a department. Everything else is "misc", which is
-   also the fourth colour on the map. */
-export type Dept = "women's" | "men's" | "unisex" | "misc";
+/* Apparel listings are women's or men's. Everything else is "misc", which is
+   also the third colour on the map. */
+export type Dept = "women's" | "men's" | "misc";
 
 export interface Listing {
   id: string;
@@ -61,7 +61,7 @@ export interface SellerPin {
   lon: number;
   lat: number;
   listings: Listing[];
-  dept: Dept; // dominant department among `listings`
+  depts: Dept[]; // departments among `listings`, in DEPTS order: the dot's pie slices
 }
 
 export type ViewMode = "heat" | "dots" | "photos";

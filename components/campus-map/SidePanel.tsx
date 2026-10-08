@@ -1,8 +1,9 @@
 "use client";
 import type { Building, SellerPin } from "./types";
 import type { WalkingRoute } from "./princeton";
-import { DEPT_COLOR, tidyCollege } from "./logic/catalog";
+import { tidyCollege } from "./logic/catalog";
 import { sortByDistance } from "./logic/pins";
+import { PieSwatch } from "./PieSwatch";
 import s from "./campus-map.module.css";
 
 export type RouteState =
@@ -85,7 +86,7 @@ export function SidePanel(p: Props) {
               <div className={s.near}>
                 {nearby.map(({ pin, meters }) => (
                   <button key={pin.seller.id} className={s.nearrow} onClick={() => p.onPickSeller(pin.seller.id)}>
-                    <i className={s.swatch} style={{ background: DEPT_COLOR[pin.dept] }} />
+                    <PieSwatch depts={pin.depts} />
                     <span>
                       <b>{pin.seller.name}</b>
                       <small>

@@ -13,7 +13,7 @@ import * as reactiveUtils from "@arcgis/core/core/reactiveUtils";
 import type { SellerPin, ViewMode } from "./types";
 import { viewMode } from "./logic/viewMode";
 import { CAMPUS_WEBMAP_ID, CLEAN_RENDER_SCALES, NEIGHBOURHOOD_LABELS, TIGERMAP_URL } from "./princeton";
-import { CLUSTER_MAX_SCALE, dotsRenderer, heatRenderer, sellerClusters } from "./renderers";
+import { CLUSTER_MAX_SCALE, comboKey, dotsRenderer, heatRenderer, sellerClusters } from "./renderers";
 import type { WalkingRoute } from "./princeton";
 
 /* Of everything in Princeton's web map, keep the building outlines. Bus
@@ -89,7 +89,7 @@ export function useCampusView(
           { name: "ObjectID", type: "oid" },
           { name: "sellerId", type: "string" },
           { name: "count", type: "integer" },
-          { name: "dept", type: "string" },
+          { name: "combo", type: "string" },
         ],
         outFields: ["*"],
         renderer: heatRenderer(0),
@@ -180,7 +180,7 @@ export function useCampusView(
       (p) =>
         new Graphic({
           geometry: new Point({ longitude: p.lon, latitude: p.lat }),
-          attributes: { sellerId: p.seller.id, count: p.listings.length, dept: p.dept },
+          attributes: { sellerId: p.seller.id, count: p.listings.length, combo: comboKey(p.depts) },
         }),
     );
     // serialise edits so a fast run of filter clicks can't interleave

@@ -79,7 +79,7 @@ const weightedSection = () => {
 const subsOf = new Map(SECTIONS);
 
 /* Each seller leans one way, so dot colours mean something. */
-const LEAN: Dept[] = ["women's", "women's", "men's", "men's", "unisex", "misc"];
+const LEAN: Dept[] = ["women's", "women's", "men's", "men's", "misc"];
 
 /* Buildings drawn in proportion to their HOMES weight. */
 const HOME_POOL = HOMES.flatMap(([b, w]) => Array<string>(w).fill(b));
@@ -110,7 +110,7 @@ export function demoMarketplace(
     for (let k = 0; k < items; k++) {
       const section = lean === "misc" && rnd() < 0.7 ? pick(["dorm", "school supplies", "everything else"] as Section[]) : weightedSection();
       const sub = pick(subsOf.get(section)!);
-      const dept: Dept = !APPAREL.has(section) ? "misc" : rnd() < 0.75 && lean !== "misc" ? lean : pick(["women's", "men's", "unisex"] as Dept[]);
+      const dept: Dept = !APPAREL.has(section) ? "misc" : rnd() < 0.75 && lean !== "misc" ? lean : pick(["women's", "men's"] as Dept[]);
       const title = pick(TITLES[sub]);
       const ageDays = rnd() < 0.5 ? rnd() * 7 : rnd() * 40;
       listings.push({
