@@ -4,8 +4,9 @@ import type MapView from "@arcgis/core/views/MapView";
 import Point from "@arcgis/core/geometry/Point";
 import * as reactiveUtils from "@arcgis/core/core/reactiveUtils";
 import type { Listing, Seller, SellerPin } from "./types";
-import { DEPT_COLOR, tidyCollege } from "./logic/catalog";
+import { tidyCollege } from "./logic/catalog";
 import { placePopover } from "./logic/popover";
+import { PieSwatch } from "./PieSwatch";
 import s from "./campus-map.module.css";
 
 interface Props {
@@ -64,7 +65,9 @@ export function SellerGallery(p: Props) {
     >
       <span ref={arrowRef} className={s.arrow} />
       <div className={s.ghead}>
-        <i className={s.swatch} style={{ background: DEPT_COLOR[p.pin.dept], marginTop: 5 }} />
+        <span style={{ marginTop: 4 }}>
+          <PieSwatch depts={pin.depts} size={14} />
+        </span>
         <div>
           <h3>
             {seller.name} <span className={s.gmeta}>· {seller.id}</span>

@@ -20,6 +20,7 @@ import { FilterPanel } from "./FilterPanel";
 import { PhotoPinList, usePhotoPins } from "./PhotoPins";
 import { SellerGallery } from "./SellerGallery";
 import { SidePanel, type RouteState } from "./SidePanel";
+import { PieSwatch } from "./PieSwatch";
 import s from "./campus-map.module.css";
 
 export interface CampusMapProps {
@@ -282,6 +283,10 @@ export default function CampusMap({ sellers, listings, acceptedSellerIds = [], o
                       {d}
                     </span>
                   ))}
+                </div>
+                <div className={s.legrow} style={{ flexWrap: "nowrap" }}>
+                  <PieSwatch depts={DEPTS} size={20} />
+                  <span>split dot = sells in several; gray is always on the left</span>
                 </div>
                 <div className={s.legrow}>
                   <span className={s.sizes}>

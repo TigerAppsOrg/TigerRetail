@@ -12,12 +12,11 @@ export const SECTIONS: [Section, string[]][] = [
 
 export const APPAREL = new Set<Section>(["clothing", "accessories", "special occasions"]);
 
-export const DEPTS: Dept[] = ["women's", "men's", "unisex", "misc"];
+export const DEPTS: Dept[] = ["women's", "men's", "misc"];
 
 export const DEPT_COLOR: Record<Dept, string> = {
   "women's": "#C2417A",
   "men's": "#2F6DB5",
-  unisex: "#3F7D52",
   misc: "#8A8170",
 };
 

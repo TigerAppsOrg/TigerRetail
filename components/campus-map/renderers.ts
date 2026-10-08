@@ -1,7 +1,9 @@
 import HeatmapRenderer from "@arcgis/core/renderers/HeatmapRenderer";
 import UniqueValueRenderer from "@arcgis/core/renderers/UniqueValueRenderer";
 import SizeVariable from "@arcgis/core/renderers/visualVariables/SizeVariable";
-import SimpleMarkerSymbol from "@arcgis/core/symbols/SimpleMarkerSymbol";
+import PictureMarkerSymbol from "@arcgis/core/symbols/PictureMarkerSymbol";
+import type { Dept } from "./types";
+import { pieShapes } from "./logic/pie";
 import FeatureReductionCluster from "@arcgis/core/layers/support/FeatureReductionCluster";
 import { DEPTS, DEPT_COLOR } from "./logic/catalog";
 
@@ -25,25 +27,34 @@ export const heatRenderer = (items: number) =>
     ],
   });
 
-/* Closer in: a dot per seller. Colour = department, size = matching items. */
+/* Closer in: a dot per seller, split into equal slices for each department
+   they sell (colour = department, each in its home direction), sized by how
+   many matching items they have. One symbol per combination of departments. */
+export const comboKey = (depts: Dept[]) => depts.join("|");
+
+// every non-empty set of departments
+const COMBOS: Dept[][] = Array.from({ length: 2 ** DEPTS.length - 1 }, (_, m) => DEPTS.filter((_, i) => ((m + 1) >> i) & 1));
+
+function pieSymbol(depts: Dept[]) {
+  const R = 32;
+  const r = R - 4; // leaves a white ring around the slices
+  const body = pieShapes(depts, r)
+    .map(({ dept, d }) => (d ? `<path d="${d}" fill="${DEPT_COLOR[dept]}"/>` : `<circle r="${r}" fill="${DEPT_COLOR[dept]}"/>`))
+    .join("");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-R} ${-R} ${2 * R} ${2 * R}"><circle r="${R}" fill="#fff"/>${body}</svg>`;
+  return new PictureMarkerSymbol({ url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`, width: "16px", height: "16px" });
+}
+
 export const dotsRenderer = () =>
   new UniqueValueRenderer({
-    field: "dept",
-    uniqueValueInfos: DEPTS.map((d) => ({
-      value: d,
-      label: d,
-      symbol: new SimpleMarkerSymbol({
-        style: "circle",
-        color: DEPT_COLOR[d],
-        outline: { color: "white", width: 1.5 },
-      }),
-    })),
+    field: "combo",
+    uniqueValueInfos: COMBOS.map((c) => ({ value: comboKey(c), label: c.join(" + "), symbol: pieSymbol(c) })),
     visualVariables: [
       new SizeVariable({
         field: "count",
         stops: [
-          { value: 1, size: 11 },
-          { value: 4, size: 18 },
+          { value: 1, size: 12 },
+          { value: 4, size: 19 },
           { value: 12, size: 30 },
         ],
       }),

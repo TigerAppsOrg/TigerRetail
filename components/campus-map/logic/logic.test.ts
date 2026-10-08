@@ -49,7 +49,7 @@ describe("matchesListing", () => {
   });
   it("dept filter", () => {
     expect(matchesListing(L({ dept: "men's" }), F({ depts: ["women's"] }), NOW)).toBe(false);
-    expect(matchesListing(L({ dept: "women's" }), F({ depts: ["women's", "unisex"] }), NOW)).toBe(true);
+    expect(matchesListing(L({ dept: "women's" }), F({ depts: ["women's", "misc"] }), NOW)).toBe(true);
   });
   it("recency is inclusive of the boundary and excludes older", () => {
     expect(matchesListing(L({ postedAt: daysAgo(7) }), F({ recency: "7d" }), NOW)).toBe(true);
@@ -77,15 +77,15 @@ describe("buildSellerPins", () => {
     L({ id: "2", sellerId: "a", dept: "men's" }),
     L({ id: "3", sellerId: "a", dept: "women's" }),
     L({ id: "4", sellerId: "b", section: "dorm", sub: "furniture", dept: "misc" }),
-    L({ id: "5", sellerId: "c", dept: "unisex" }),
-    L({ id: "6", sellerId: "z", dept: "unisex" }),
+    L({ id: "5", sellerId: "c", dept: "men's" }),
+    L({ id: "6", sellerId: "z", dept: "men's" }),
   ];
 
-  it("one pin per seller with matching listings and the dominant dept", () => {
+  it("one pin per seller with matching listings, listing every department they sell", () => {
     const { pins } = buildSellerPins(sellers, listings, buildings, emptyFilters(), NOW);
     const a = pins.find((p) => p.seller.id === "a")!;
     expect(a.listings.map((l) => l.id)).toEqual(["1", "2", "3"]);
-    expect(a.dept).toBe("men's");
+    expect(a.depts).toEqual(["women's", "men's"]);
     expect(pins.map((p) => p.seller.id).sort()).toEqual(["a", "b", "c"]);
   });
   it("reports sellers whose building is not in Princeton's layer instead of dropping them silently", () => {
@@ -96,7 +96,7 @@ describe("buildSellerPins", () => {
     const { pins } = buildSellerPins(sellers, listings, buildings, F({ depts: ["women's"] }), NOW);
     expect(pins.map((p) => p.seller.id)).toEqual(["a"]);
     expect(pins[0].listings).toHaveLength(1);
-    expect(pins[0].dept).toBe("women's");
+    expect(pins[0].depts).toEqual(["women's"]); // filtering by dept narrows the pie too
   });
   it("college and building filters apply to where the seller lives", () => {
     expect(

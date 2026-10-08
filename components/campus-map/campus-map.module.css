@@ -218,6 +218,7 @@
 
 /* ---------- legend ---------- */
 .legend {
+  max-width: 320px;
   position: absolute;
   left: 14px;
   bottom: 26px;
@@ -368,10 +369,12 @@
 }
 .ggrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* minmax(0, …): long titles ellipsize instead of pushing the grid wider than the card */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 .gitem {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -684,6 +687,7 @@
     top: 60px;
   }
   .legend {
+  max-width: 320px;
     bottom: 64px;
     left: 12px;
   }
