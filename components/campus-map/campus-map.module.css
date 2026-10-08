@@ -281,26 +281,22 @@
 
 /* ---------- legend ---------- */
 .legend {
-  max-width: 320px;
   position: absolute;
-  left: 14px;
-  bottom: 26px;
+  left: 12px;
+  bottom: 24px;
   z-index: 6;
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-pill);
   box-shadow: var(--shadow);
-  padding: 9px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
+  padding: 4px 10px;
+  font-size: 11px;
   color: var(--ink-2);
 }
 .legrow {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 9px;
   flex-wrap: wrap;
 }
 .legrow span {
@@ -308,45 +304,19 @@
   align-items: center;
   gap: 5px;
 }
-.legchip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: 1px solid transparent;
-  border-radius: var(--r-pill);
-  padding: 2px 8px 2px 5px;
-  font-size: 12px;
-  color: var(--ink-2);
-  transition: border-color 0.12s, opacity 0.12s, background 0.12s;
-}
-.legchip:hover {
-  border-color: var(--line);
-}
-.legchip[aria-pressed="true"] {
-  border-color: var(--tiger);
-  background: var(--tiger-soft);
-  color: var(--ink);
-  font-weight: 500;
-}
-.legchip[data-dim="true"] {
-  opacity: 0.45;
-}
 .heatbar {
-  width: 120px;
-  height: 8px;
+  width: 60px;
+  height: 6px;
   border-radius: 4px;
   background: linear-gradient(90deg, rgba(242, 140, 80, 0.35), rgba(223, 90, 30, 0.7), rgba(122, 42, 10, 0.95));
 }
-.sizes {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.legend .swatch {
+  width: 8px;
+  height: 8px;
+  box-shadow: none;
 }
-.sizes i {
-  display: inline-block;
-  border-radius: 50%;
-  background: var(--muted);
-  border: 1.5px solid white;
+.legrow span {
+  gap: 4px;
 }
 
 /* ---------- photo pins (drawn by ArcGIS; this is their keyboard mirror) ---------- */
