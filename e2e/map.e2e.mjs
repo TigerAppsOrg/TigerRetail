@@ -55,18 +55,13 @@ async function zoomOut(page, times = 1) {
   await page.waitForTimeout(1200);
 }
 
-/* every pair of visible photo frames must not overlap */
-async function framesOverlap(page) {
-  const boxes = await page.locator("[class*=pinframe]").evaluateAll((els) =>
-    els.map((e) => e.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, w: r.width, h: r.height })),
-  );
-  let hits = 0;
-  for (let i = 0; i < boxes.length; i++)
-    for (let j = i + 1; j < boxes.length; j++) {
-      const a = boxes[i], b = boxes[j];
-      if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) hits++;
-    }
-  return { frames: boxes.length, hits };
+/* Photo pins are drawn by ArcGIS on the map canvas; the shown ones are
+   mirrored as keyboard buttons, which is how this script finds and opens them. */
+const photoPins = (page) => page.getByRole("list", { name: "Sellers with matching items on the map" }).getByRole("button");
+const multiPins = (page) => photoPins(page).filter({ hasText: /matching items$/ });
+async function press(locator) {
+  await locator.focus();
+  await locator.page().keyboard.press("Enter");
 }
 
 /* drag the stress slider and wait until the map reports that many items */
@@ -83,13 +78,13 @@ async function setListings(page, n) {
 
   const banner = await page.locator("[class*=banner]").textContent();
   check(/\d+ items across campus/.test(banner), `heat view banner: "${banner.trim()}"`);
-  check((await page.locator("[class*=pinframe]").count()) === 0, "no photo pins at campus scale");
+  check((await photoPins(page).count()) === 0, "no photo pins at campus scale");
   await shot(page, "01-heatmap-campus");
 
   await zoomIn(page, 2);
   const banner2 = await page.locator("[class*=banner]").textContent();
   check(/Filter by what you want/.test(banner2), `dots view banner: "${banner2.trim()}"`);
-  check((await page.locator("[class*=pinframe]").count()) === 0, "still no photo pins without an item filter");
+  check((await photoPins(page).count()) === 0, "still no photo pins without an item filter");
   await shot(page, "02-seller-dots");
 
   await page.getByRole("button", { name: "clothing", exact: true }).click();
@@ -97,18 +92,28 @@ async function setListings(page, n) {
   await shot(page, "03-filter-clothing-dots");
 
   await zoomIn(page, 1);
-  const pins = page.locator("button[aria-label*='matching item']");
+  const pins = photoPins(page);
+  await pins.first().waitFor({ timeout: 15_000 });
   const nPins = await pins.count();
   check(nPins > 0, `photo pins appear when zoomed in with a filter (${nPins})`);
-  const multi = page.locator("button[aria-label*='matching items']");
+  const multi = multiPins(page);
   check((await multi.count()) > 0, "at least one multi-item (carousel) pin");
   await shot(page, "04-photo-pins");
 
+  // pins are drawn by the map itself: drag the map and they must stay on their dots
+  const stage = await page.locator("[class*=stage]").first().boundingBox();
+  await page.mouse.move(stage.x + 500, stage.y + 450);
+  await page.mouse.down();
+  await page.mouse.move(stage.x + 420, stage.y + 390, { steps: 6 });
+  await shot(page, "04b-photo-pins-mid-drag");
+  await page.mouse.up();
+  await page.waitForTimeout(800);
+
   // the pop-out gallery
-  await multi.first().click();
+  await press(multi.first());
   const gallery = page.getByRole("dialog");
   await gallery.waitFor();
-  check((await page.locator("[class*=pinframe]").count()) === 0, "other photo pins hide while a gallery is open");
+  check((await photoPins(page).count()) === 0, "other photo pins hide while a gallery is open");
   const gtext = await gallery.textContent();
   check(/match your filters|items for sale/.test(gtext), "gallery shows matching-item count");
   check(/Room directions are shared once|Room directions:/.test(gtext), "gallery shows room-directions privacy state");
@@ -123,6 +128,7 @@ async function setListings(page, n) {
   await page.keyboard.press("Escape");
   await page.waitForTimeout(400);
   check((await page.getByRole("dialog").count()) === 0, "Escape closes the gallery");
+  await page.waitForTimeout(1500);
   check((await pins.count()) > 0, "photo pins come back after closing");
 
   // nearby
@@ -165,8 +171,9 @@ async function setListings(page, n) {
 
   await page.getByRole("button", { name: "clothing", exact: true }).click();
   await zoomIn(page, 1); // 1:2000 → photos
-  const o = await framesOverlap(page);
-  check(o.frames > 0 && o.hits === 0, `1000 listings, photo view: ${o.frames} frames, ${o.hits} overlapping`);
+  await photoPins(page).first().waitFor({ timeout: 15_000 });
+  const shown = await photoPins(page).count();
+  check(shown > 0 && shown <= 40, `1000 listings, photo view: ${shown} frames shown after decluttering`);
   await shot(page, "15-stress-1000-photo-pins");
 
   await page.getByRole("button", { name: "Clear all filters" }).click();
@@ -195,14 +202,13 @@ async function setListings(page, n) {
   await page.getByRole("button", { name: "Close filters" }).click();
   await page.getByRole("button", { name: "Hide panel" }).click();
 
-  const pins = page.locator("button[aria-label*='matching item']");
-  // double-clicks can be swallowed mid-animation on a small screen: zoom until photo scale
+  const pins = photoPins(page);
   for (let i = 0; i < 5 && !(await pins.count()); i++) await zoomIn(page, 1);
   check((await pins.count()) > 0, `mobile: photo pins (${await pins.count()})`);
   await shot(page, "10-mobile-photo-pins");
 
   if (await pins.count()) {
-    await pins.first().click();
+    await press(pins.first());
     const g = page.getByRole("dialog");
     await g.waitFor();
     const gb = await g.boundingBox();

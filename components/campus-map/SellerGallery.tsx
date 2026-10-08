@@ -1,7 +1,8 @@
 "use client";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useRef } from "react";
 import type MapView from "@arcgis/core/views/MapView";
 import Point from "@arcgis/core/geometry/Point";
+import * as reactiveUtils from "@arcgis/core/core/reactiveUtils";
 import type { Listing, Seller, SellerPin } from "./types";
 import { DEPT_COLOR, tidyCollege } from "./logic/catalog";
 import { placePopover } from "./logic/popover";
@@ -9,7 +10,6 @@ import s from "./campus-map.module.css";
 
 interface Props {
   view: MapView;
-  frame: number;
   pin: SellerPin;
   totalListings: number;
   filtered: boolean;
@@ -25,34 +25,44 @@ interface Props {
 const W = 320;
 
 /* The pop-out gallery. It hangs beside its pin and follows it as the map
-   moves, but never moves the map itself. */
+   moves, but never moves the map itself. Position is written straight to the
+   DOM from a synchronous ArcGIS watch, so it moves in the same frame as the
+   map instead of trailing a React render behind it. */
 export function SellerGallery(p: Props) {
   const ref = useRef<HTMLDivElement>(null);
-  const [h, setH] = useState(360);
+  const arrowRef = useRef<HTMLSpanElement>(null);
+  const { view, pin, reserveRight } = p;
+
   useLayoutEffect(() => {
-    if (ref.current) setH(ref.current.offsetHeight);
-  }, [p.pin]);
+    const el = ref.current;
+    if (!el) return;
+    const point = new Point({ longitude: pin.lon, latitude: pin.lat });
+    const place = () => {
+      const anchor = view.toScreen(point) ?? { x: -9999, y: -9999 };
+      // the side panel only sits on the right on wide screens (see .panel media query)
+      const reserve = window.innerWidth > 820 ? reserveRight : 0;
+      const at = placePopover(anchor, { w: W, h: el.offsetHeight }, { w: view.width - reserve, h: view.height });
+      el.dataset.side = at.side;
+      el.style.left = at.side === "sheet" ? "" : `${at.left}px`;
+      el.style.top = at.side === "sheet" ? "" : `${at.top}px`;
+      if (arrowRef.current) arrowRef.current.style.top = `${at.arrow}px`;
+    };
+    place();
+    const h = reactiveUtils.watch(() => [view.extent, view.size], place, { sync: true });
+    return () => h.remove();
+  }, [view, pin, reserveRight]);
 
-  const point = useMemo(() => new Point({ longitude: p.pin.lon, latitude: p.pin.lat }), [p.pin]);
-  void p.frame;
-  const anchor = p.view.toScreen(point) ?? { x: -9999, y: -9999 };
-  // the side panel only sits on the right on wide screens (see .panel media query)
-  const reserve = typeof window !== "undefined" && window.innerWidth > 820 ? p.reserveRight : 0;
-  const place = placePopover(anchor, { w: W, h }, { w: p.view.width - reserve, h: p.view.height });
-
-  const { seller, building, listings } = p.pin;
-  const style = place.side === "sheet" ? undefined : { left: place.left, top: place.top };
+  const { seller, building, listings } = pin;
 
   return (
     <div
       ref={ref}
-      className={`${s.gallery} ${s[place.side]}`}
-      style={style}
+      className={s.gallery}
       role="dialog"
       aria-label={`${seller.name}'s items`}
       onKeyDown={(e) => e.key === "Escape" && p.onClose()}
     >
-      {place.side !== "sheet" && <span className={s.arrow} style={{ top: place.arrow }} />}
+      <span ref={arrowRef} className={s.arrow} />
       <div className={s.ghead}>
         <i className={s.swatch} style={{ background: DEPT_COLOR[p.pin.dept], marginTop: 5 }} />
         <div>

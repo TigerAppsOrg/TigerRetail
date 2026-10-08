@@ -38,11 +38,11 @@ export type MapHit =
 
 export interface CampusView {
   view: MapView | null;
+  photos: GraphicsLayer | null; // photo pins draw here, right above the dots
   mode: ViewMode;
   ready: boolean;
   error: string | null;
   scale: number;
-  frame: number; // bumps whenever the visible extent moves
 }
 
 export function useCampusView(
@@ -53,15 +53,16 @@ export function useCampusView(
   walkingRoute: WalkingRoute | null,
   onMapClick: (view: MapView, hit: MapHit) => void,
 ): CampusView {
-  const [state, setState] = useState<Omit<CampusView, "mode">>({ view: null, ready: false, error: null, scale: 0, frame: 0 });
+  const [state, setState] = useState<Omit<CampusView, "mode">>({ view: null, photos: null, ready: false, error: null, scale: 0 });
   const mode = viewMode(state.ready ? state.scale : Infinity, itemFilter);
-  const layers = useRef<{ sellers: FeatureLayer; overlay: GraphicsLayer; route: GraphicsLayer } | null>(null);
+  const layers = useRef<{ sellers: FeatureLayer; photos: GraphicsLayer; overlay: GraphicsLayer; route: GraphicsLayer } | null>(null);
   const edits = useRef<Promise<unknown>>(Promise.resolve());
   // In heat mode a click zooms in; a cluster zooms in until it splits;
   // otherwise it picks the seller under the cursor.
-  const handleClick = useEffectEvent(async (view: MapView, sellers: FeatureLayer, e: { mapPoint: Point } & Parameters<MapView["hitTest"]>[0]) => {
+  const handleClick = useEffectEvent(async (view: MapView, targets: (FeatureLayer | GraphicsLayer)[], e: { mapPoint: Point } & Parameters<MapView["hitTest"]>[0]) => {
     if (mode === "heat") return onMapClick(view, { kind: "zoom", point: e.mapPoint, scale: 8_000 });
-    const hit = await view.hitTest(e, { include: [sellers] });
+    // photo pins sit on top of the dots, so they win when both are under the cursor
+    const hit = await view.hitTest(e, { include: targets });
     const r = hit.results.find((x) => x.type === "graphic");
     const g = r && "graphic" in r ? r.graphic : null;
     if (!g) return onMapClick(view, { kind: "empty" });
@@ -95,6 +96,7 @@ export function useCampusView(
         popupEnabled: false,
       });
       const route = new GraphicsLayer({ title: "route" });
+      const photos = new GraphicsLayer({ title: "photo pins" });
       const overlay = new GraphicsLayer({ title: "selection" });
       const view = new MapView({
         container: el,
@@ -105,13 +107,12 @@ export function useCampusView(
         constraints: { rotationEnabled: false },
       });
       view.ui.move("zoom", "bottom-right");
-      layers.current = { sellers, overlay, route };
+      layers.current = { sellers, photos, overlay, route };
 
-      let raf = 0;
-      const bump = () => {
-        cancelAnimationFrame(raf);
-        raf = requestAnimationFrame(() => setState((s) => ({ ...s, frame: s.frame + 1, scale: view.scale })));
-      };
+      // React only hears about zoom once the map comes to rest: the heat/dots/
+      // photos switch then happens once per zoom. Swapping the renderer or the
+      // clustering mid-animation left ArcGIS drawing only part of the layer.
+      const onScale = () => setState((s) => (s.scale === view.scale ? s : { ...s, scale: view.scale }));
 
       const handles: { remove(): void }[] = [];
       // React may unmount before loading finishes (StrictMode does it on purpose);
@@ -125,7 +126,7 @@ export function useCampusView(
             l.visible = KEEP_LAYERS.has(l.title ?? "");
             if ("popupEnabled" in l) (l as FeatureLayer).popupEnabled = false;
           });
-          map.addMany([route, sellers, overlay]);
+          map.addMany([route, sellers, photos, overlay]);
           // Same Princeton basemap, rendered on request without the faded
           // neighbourhood watermarks, drawn over the cached tiles only at the
           // zoom levels that have them. It's a nicety: if it fails the map
@@ -149,9 +150,9 @@ export function useCampusView(
         })
         .then(() => {
           if (disposed) return;
-          setState((s) => ({ ...s, view, ready: true, scale: view.scale }));
-          handles.push(reactiveUtils.watch(() => [view.extent, view.size], bump));
-          handles.push(view.on("click", (e) => void handleClick(view, sellers, e)));
+          setState((s) => ({ ...s, view, photos, ready: true, scale: view.scale }));
+          handles.push(reactiveUtils.when(() => view.stationary, onScale));
+          handles.push(view.on("click", (e) => void handleClick(view, [photos, sellers], e)));
         })
         .catch((e: unknown) => {
           if (disposed) return;
@@ -160,7 +161,6 @@ export function useCampusView(
 
       teardown = () => {
         disposed = true;
-        cancelAnimationFrame(raf);
         handles.forEach((h) => h.remove());
         view.destroy();
         layers.current = null;
@@ -195,22 +195,27 @@ export function useCampusView(
       .catch((e: unknown) => setState((s) => ({ ...s, error: `Couldn't draw sellers: ${e instanceof Error ? e.message : String(e)}` })));
   }, [pins, state.ready]);
 
-  // ---- heat vs dots (clustered at neighbourhood zoom) ----
-  // Clustering is switched on/off here by scale rather than with the cluster's
-  // own maxScale: past maxScale, ArcGIS 5.1 left most individual dots undrawn.
+  // ---- heat vs dots, clustered at neighbourhood zoom ----
+  // Clustering is switched here by scale rather than with the cluster's own
+  // maxScale: past maxScale, ArcGIS 5.1 left most individual dots undrawn.
+  // Each property is only reassigned when it actually changes.
   const itemsShown = pins.reduce((a, p) => a + p.listings.length, 0);
-  const clustered = mode !== "heat" && state.scale > CLUSTER_MAX_SCALE;
+  const heat = mode === "heat";
+  const clustered = !heat && state.scale > CLUSTER_MAX_SCALE;
   useEffect(() => {
     const l = layers.current;
     if (!l || !state.ready) return;
-    if (mode === "heat") {
-      l.sellers.featureReduction = null; // clustering and heatmaps don't mix
-      l.sellers.renderer = heatRenderer(itemsShown);
+    const layer = l.sellers;
+    const isClustered = layer.featureReduction?.type === "cluster";
+    if (heat) {
+      // clustering and heatmaps don't mix: drop clusters before the heat renderer goes on
+      if (isClustered) layer.featureReduction = null;
+      layer.renderer = heatRenderer(itemsShown);
     } else {
-      l.sellers.renderer = dotsRenderer();
-      l.sellers.featureReduction = clustered ? sellerClusters() : null;
+      if (layer.renderer?.type !== "unique-value") layer.renderer = dotsRenderer();
+      if (clustered !== isClustered) layer.featureReduction = clustered ? sellerClusters() : null;
     }
-  }, [mode, clustered, itemsShown, state.ready]);
+  }, [heat, clustered, itemsShown, state.ready]);
 
   // ---- ring around the selected seller ----
   useEffect(() => {
