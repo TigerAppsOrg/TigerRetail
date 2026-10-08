@@ -88,6 +88,69 @@
   font-weight: 600;
   letter-spacing: 0.03em;
 }
+.clearall {
+  position: sticky;
+  bottom: -24px; /* sits flush with the sidebar's bottom edge, over its padding */
+  margin: 8px -16px -24px;
+  padding: 10px 16px 14px;
+  background: var(--paper);
+  border-top: 1px solid var(--line-2);
+  display: flex;
+  z-index: 1;
+}
+.clearall button {
+  flex: 1;
+}
+.gtoggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 2px 0;
+}
+.gtoggle:hover {
+  color: var(--tiger);
+}
+.chev {
+  opacity: 0.6;
+  transition: transform 0.15s;
+}
+.gtoggle[aria-expanded="false"] .chev {
+  transform: rotate(-90deg);
+}
+.gcount {
+  background: var(--tiger);
+  color: var(--tiger-ink);
+  border-radius: var(--r-pill);
+  font-size: 10.5px;
+  font-weight: 600;
+  min-width: 17px;
+  padding: 0 5px;
+  line-height: 16px;
+  text-align: center;
+}
+.gbody2 {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.subgrp {
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+  padding-top: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sublabel {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--tiger);
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
+}
 .clear {
   font-size: 12px;
   color: var(--muted);
@@ -173,7 +236,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 5;
+  z-index: 9; /* the open gallery sits above the legend and side panel */
 }
 .overlay > * {
   pointer-events: auto;

@@ -153,6 +153,58 @@ async function setListings(page, n) {
   await page.close();
 }
 
+// ---------------- filter sidebar: collapsing and grouping ----------------
+{
+  const page = await open({ width: 1440, height: 900 });
+  const panel = page.getByRole("complementary", { name: "Map filters" });
+
+  await panel.getByRole("button", { name: "clothing", exact: true }).click();
+  await panel.getByRole("button", { name: "accessories", exact: true }).click();
+  const clothingTypes = panel.getByRole("group", { name: "clothing" });
+  const accessoryTypes = panel.getByRole("group", { name: "accessories" });
+  check((await clothingTypes.getByRole("button").allTextContents()).join(",") === "tops,bottoms,dresses/rompers,outerwear,shoes", "clothing types grouped under 'clothing'");
+  check((await accessoryTypes.getByRole("button").allTextContents()).includes("jewelry"), "accessory types grouped separately under 'accessories'");
+
+  await panel.getByRole("button", { name: /^Butler/ }).click();
+  await panel.getByRole("button", { name: /^Forbes/ }).click();
+  const butler = await panel.getByRole("group", { name: "Butler College halls" }).getByRole("button").allTextContents();
+  const forbes = await panel.getByRole("group", { name: "Forbes College halls" }).getByRole("button").allTextContents();
+  check(butler.length === 6 && butler.includes("1976 Hall") && !butler.includes("Forbes College Main"), `Butler halls listed under Butler (${butler.length})`);
+  check(forbes.length === 2 && forbes.includes("Forbes Courtyard Annex"), `Forbes halls listed under Forbes (${forbes.length})`);
+  await shot(page, "18-filters-grouped");
+
+  const what = panel.getByRole("button", { name: /^What/ });
+  await what.click();
+  check((await what.getAttribute("aria-expanded")) === "false", "What collapses");
+  check((await panel.getByRole("button", { name: "clothing", exact: true }).count()) === 0, "collapsed What hides its chips");
+  check(/2$/.test((await what.textContent()).trim()), "collapsed What still shows 2 active filters");
+  await panel.getByRole("button", { name: /^Where/ }).click();
+  const collapsedBtn = await panel.getByRole("button", { name: "Clear all filters" }).boundingBox();
+  check(collapsedBtn && collapsedBtn.height < 50, `Clear all stays button-sized with sections collapsed (${Math.round(collapsedBtn?.height ?? 0)}px tall)`);
+  await shot(page, "19-filters-collapsed");
+  await what.click();
+  check((await panel.getByRole("button", { name: "clothing", exact: true }).getAttribute("aria-pressed")) === "true", "re-opening What keeps the selection");
+
+  // Clear all stays on screen however long the sidebar gets, and nothing covers it
+  const clearAll = panel.getByRole("button", { name: "Clear all filters" });
+  const cb = await clearAll.boundingBox();
+  check(cb && cb.y + cb.height <= 900, "Clear all filters is visible without scrolling");
+  const onTop = await clearAll.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest("button") === el;
+  });
+  check(onTop, "nothing covers Clear all filters");
+  await page.waitForTimeout(300);
+  await shot(page, "20-filters-clear-all");
+  await clearAll.click();
+  await page.waitForTimeout(300);
+  check((await panel.locator("[aria-pressed=true]").count()) === 0, "Clear all filters unpresses every chip");
+  check((await clearAll.count()) === 0, "Clear all filters goes away once nothing is filtered");
+  check(/· 200 items/.test(await panel.textContent()), "map back to all 200 items");
+
+  await page.close();
+}
+
 // ---------------- stress: 1000 and 50 listings ----------------
 {
   const page = await open({ width: 1440, height: 900 });
