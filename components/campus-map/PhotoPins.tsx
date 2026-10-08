@@ -1,76 +1,116 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+/* Photo pins, drawn by ArcGIS in a graphics layer right above the seller dots,
+   so they pan and zoom in lockstep with them. Fixed screen size at any zoom.
+   Overlapping frames are thinned out whenever the map comes to rest (biggest
+   seller wins); their dots stay visible underneath. */
+import { useEffect, useState } from "react";
 import type MapView from "@arcgis/core/views/MapView";
+import type GraphicsLayer from "@arcgis/core/layers/GraphicsLayer";
+import Graphic from "@arcgis/core/Graphic";
 import Point from "@arcgis/core/geometry/Point";
+import PictureMarkerSymbol from "@arcgis/core/symbols/PictureMarkerSymbol";
+import * as reactiveUtils from "@arcgis/core/core/reactiveUtils";
 import type { SellerPin } from "./types";
 import { declutter } from "./logic/declutter";
+import { MARKER, photoMarker } from "./photoMarker";
 import s from "./campus-map.module.css";
 
-const BOX = { w: 66, h: 74 }; // frame + tail, with a little air
 const ROTATE_MS = 2400;
+const CAROUSEL_MAX = 5;
 
-const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/* Photo frames standing on top of each seller's dot. White frame = one item,
-   orange frame = several, cycling. Overlapping frames are thinned out
-   (biggest seller wins); their dots are still on the map underneath. */
-export function PhotoPins({ view, pins, frame, onSelect }: { view: MapView; pins: SellerPin[]; frame: number; onSelect: (id: string) => void }) {
-  const [tick, setTick] = useState(0);
+export function usePhotoPins(
+  view: MapView | null,
+  layer: GraphicsLayer | null,
+  pins: SellerPin[],
+  active: boolean,
+  onError: (msg: string) => void,
+): SellerPin[] {
+  const [shownPins, setShownPins] = useState<SellerPin[]>([]);
+
   useEffect(() => {
-    if (reducedMotion()) return;
-    const t = setInterval(() => setTick((n) => n + 1), ROTATE_MS);
-    return () => clearInterval(t);
-  }, []);
+    if (!view || !layer) return;
+    layer.removeAll();
+    if (!active) return;
 
-  const points = useMemo(() => new Map(pins.map((p) => [p.seller.id, new Point({ longitude: p.lon, latitude: p.lat })])), [pins]);
+    let cancelled = false;
+    const entries = pins.map((pin) => ({
+      pin,
+      shown: 0,
+      ready: false,
+      graphic: new Graphic({
+        geometry: new Point({ longitude: pin.lon, latitude: pin.lat }),
+        attributes: { sellerId: pin.seller.id },
+        visible: false,
+      }),
+    }));
+    layer.addMany(entries.map((e) => e.graphic));
 
-  const placed = useMemo(() => {
-    void frame; // recompute on every view move
-    const vp = { w: view.width, h: view.height };
-    const screen = pins.flatMap((p) => {
-      const sp = view.toScreen(points.get(p.seller.id)!);
-      return sp ? [{ pin: p, x: sp.x, y: sp.y }] : [];
-    });
-    // box is centred above the dot, so declutter on the frame's centre
-    const keep = declutter(
-      screen.map(({ pin, x, y }) => ({ id: pin.seller.id, x, y: y - BOX.h / 2, priority: pin.listings.length })),
-      BOX,
-      vp,
-    );
-    return screen.filter((p) => keep.has(p.pin.seller.id));
-  }, [pins, points, view, frame]);
+    const fail = (e: unknown) => !cancelled && onError(e instanceof Error ? e.message : String(e));
 
+    const setFrame = (e: (typeof entries)[number]) => {
+      const n = e.pin.listings.length;
+      const listing = e.pin.listings[e.shown % Math.min(n, CAROUSEL_MAX)];
+      return photoMarker({ imageUrl: listing.imageUrl, count: n, shown: e.shown }).then((url) => {
+        if (cancelled) return;
+        e.graphic.symbol = new PictureMarkerSymbol({ url, width: `${MARKER.w}px`, height: `${MARKER.h}px`, yoffset: `${MARKER.yoffset}px` });
+        e.ready = true;
+      });
+    };
+
+    const relayout = () => {
+      if (cancelled) return;
+      const screen = entries.flatMap((e) => {
+        const sp = view.toScreen(e.graphic.geometry as Point);
+        return sp ? [{ id: e.pin.seller.id, x: sp.x, y: sp.y - MARKER.boxLift, priority: e.pin.listings.length }] : [];
+      });
+      const keep = declutter(screen, MARKER.box, { w: view.width, h: view.height });
+      for (const e of entries) e.graphic.visible = e.ready && keep.has(e.pin.seller.id);
+      setShownPins(entries.filter((e) => e.graphic.visible).map((e) => e.pin));
+    };
+
+    Promise.all(entries.map(setFrame)).then(relayout, fail);
+
+    const handles = [
+      reactiveUtils.when(() => view.stationary, relayout),
+      reactiveUtils.watch(() => view.size, relayout),
+    ];
+
+    const timer = reducedMotion()
+      ? undefined
+      : setInterval(() => {
+          for (const e of entries) {
+            if (e.pin.listings.length < 2) continue;
+            e.shown += 1;
+            setFrame(e).catch(fail);
+          }
+        }, ROTATE_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      handles.forEach((h) => h.remove());
+      layer.removeAll();
+    };
+  }, [view, layer, pins, active, onError]);
+
+  return active ? shownPins : [];
+}
+
+/* Canvas markers can't take keyboard focus, so the visible pins are mirrored
+   as a list of real buttons for keyboard and screen-reader users. */
+export function PhotoPinList({ pins, onSelect }: { pins: SellerPin[]; onSelect: (id: string) => void }) {
+  if (!pins.length) return null;
   return (
-    <>
-      {placed.map(({ pin, x, y }) => {
-        const n = pin.listings.length;
-        const shown = n > 1 ? tick % n : 0;
-        return (
-          <button
-            key={pin.seller.id}
-            className={`${s.pin} ${n > 1 ? s.multi : ""}`}
-            style={{ transform: `translate(${x}px, ${y - 6}px) translate(-50%, -100%)` }}
-            onClick={() => onSelect(pin.seller.id)}
-            aria-label={`${pin.seller.name}: ${n} matching item${n === 1 ? "" : "s"}`}
-          >
-            {n > 1 && <span className={s.pinbadge}>{n}</span>}
-            <span className={s.pinframe}>
-              {pin.listings.slice(0, 5).map((l, i) => (
-                // eslint-disable-next-line @next/next/no-img-element -- data URIs and seller uploads, not optimisable statics
-                <img key={l.id} src={l.imageUrl} alt="" style={{ opacity: i === shown % Math.min(n, 5) ? 1 : 0 }} />
-              ))}
-              {n > 1 && (
-                <span className={s.pindots}>
-                  {pin.listings.slice(0, 5).map((l, i) => (
-                    <i key={l.id} className={i === shown % Math.min(n, 5) ? s.on : ""} />
-                  ))}
-                </span>
-              )}
-            </span>
-            <span className={s.pintail} />
+    <ul className={s.srOnly} aria-label="Sellers with matching items on the map">
+      {pins.map((p) => (
+        <li key={p.seller.id}>
+          <button onClick={() => onSelect(p.seller.id)}>
+            {p.seller.name}: {p.listings.length} matching item{p.listings.length === 1 ? "" : "s"}
           </button>
-        );
-      })}
-    </>
+        </li>
+      ))}
+    </ul>
   );
 }

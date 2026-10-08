@@ -262,90 +262,17 @@
   border: 1.5px solid white;
 }
 
-/* ---------- photo pins ---------- */
-.pin {
-  display: block;
+/* ---------- photo pins (drawn by ArcGIS; this is their keyboard mirror) ---------- */
+.srOnly {
   position: absolute;
-  left: 0;
-  top: 0;
-  width: 58px;
-  transform: translate(-50%, -100%);
-  will-change: transform;
-}
-.pinframe {
-  display: block;
-  position: relative;
-  width: 58px;
-  height: 58px;
-  border-radius: 12px;
-  background: var(--surface);
-  border: 3px solid white;
-  box-shadow: 0 6px 18px rgba(23, 21, 15, 0.28);
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
   overflow: hidden;
-  transition: transform 0.15s;
-}
-.pin:hover .pinframe {
-  transform: scale(1.08);
-}
-.pinframe img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: opacity 0.45s;
-}
-.multi .pinframe {
-  border-color: var(--tiger);
-}
-.pintail {
-  display: block;
-  width: 12px;
-  height: 12px;
-  margin: -7px auto 0;
-  transform: rotate(45deg);
-  background: white;
-  box-shadow: 3px 3px 6px rgba(23, 21, 15, 0.15);
-}
-.multi .pintail {
-  background: var(--tiger);
-}
-.pinbadge {
-  position: absolute;
-  right: -8px;
-  top: -8px;
-  z-index: 2;
-  min-width: 20px;
-  height: 20px;
-  border-radius: var(--r-pill);
-  background: var(--tiger);
-  color: var(--tiger-ink);
-  border: 2px solid white;
-  font-size: 11px;
-  font-weight: 600;
-  display: grid;
-  place-items: center;
-  padding: 0 4px;
-  font-variant-numeric: tabular-nums;
-}
-.pindots {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 4px;
-  display: flex;
-  justify-content: center;
-  gap: 3px;
-}
-.pindots i {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.6);
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.4);
-}
-.pindots i.on {
-  background: white;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ---------- gallery pop-out ---------- */
@@ -380,23 +307,26 @@
   transform: translateY(-50%) rotate(45deg);
   border: 1px solid var(--line);
 }
-.right .arrow {
+.gallery[data-side="right"] .arrow {
   left: -8px;
   border-top: none;
   border-right: none;
 }
-.left .arrow {
+.gallery[data-side="left"] .arrow {
   right: -8px;
   border-bottom: none;
   border-left: none;
 }
-.sheet {
+.gallery[data-side="sheet"] {
   left: 8px;
   right: 8px;
   bottom: 8px;
   top: auto;
   width: auto;
   max-height: 62%;
+}
+.gallery[data-side="sheet"] .arrow {
+  display: none;
 }
 .ghead {
   display: flex;
@@ -760,9 +690,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gallery,
-  .pinframe img {
+  .gallery {
     animation: none;
-    transition: none;
   }
 }

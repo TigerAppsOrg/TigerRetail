@@ -17,7 +17,7 @@ import { DEPTS, DEPT_COLOR, tidyCollege } from "./logic/catalog";
 import { fetchResidentialBuildings, solveWalkingRoute } from "./princeton";
 import { ignoreInterrupt, useCampusView, type MapHit } from "./useCampusView";
 import { FilterPanel } from "./FilterPanel";
-import { PhotoPins } from "./PhotoPins";
+import { PhotoPinList, usePhotoPins } from "./PhotoPins";
 import { SellerGallery } from "./SellerGallery";
 import { SidePanel, type RouteState } from "./SidePanel";
 import s from "./campus-map.module.css";
@@ -100,6 +100,9 @@ export default function CampusMap({ sellers, listings, acceptedSellerIds = [], o
   const mode = cv.mode;
   // the gallery hides at campus scale: there are no dots there to anchor it to
   const selected = mode === "heat" ? null : selectedPin;
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  // opening a gallery clears the other photo pins, so it's the only thing in focus
+  const shownPhotoPins = usePhotoPins(cv.view, cv.photos, pins, mode === "photos" && !selected, setPhotoError);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setSelectedId(null);
@@ -139,7 +142,8 @@ export default function CampusMap({ sellers, listings, acceptedSellerIds = [], o
   };
 
   const itemCount = pins.reduce((a, p) => a + p.listings.length, 0);
-  const error = cv.error ?? (buildingsError && `Couldn't load Princeton's dorm buildings: ${buildingsError}`);
+  const error =
+    cv.error ?? (buildingsError && `Couldn't load Princeton's dorm buildings: ${buildingsError}`) ?? (photoError && `Couldn't draw photo pins: ${photoError}`);
 
   return (
     <div className={s.root}>
@@ -207,11 +211,10 @@ export default function CampusMap({ sellers, listings, acceptedSellerIds = [], o
 
         {cv.view && (
           <div className={s.overlay}>
-            {mode === "photos" && !selected && <PhotoPins view={cv.view} pins={pins} frame={cv.frame} onSelect={setSelectedId} />}
+            <PhotoPinList pins={shownPhotoPins} onSelect={setSelectedId} />
             {selected && (
               <SellerGallery
                 view={cv.view}
-                frame={cv.frame}
                 pin={selected}
                 totalListings={totalBySeller.get(selected.seller.id) ?? selected.listings.length}
                 filtered={selected.listings.length < (totalBySeller.get(selected.seller.id) ?? 0)}
