@@ -46,9 +46,6 @@ Everyone works on the same dev database and photo bucket, so:
 - Tell the team before you run `npm run migrate`, `npm run seed` or `npm run seed:clear`. They change everyone's data.
 - The e2e tests create `e2e-*` users and delete them when they finish.
 
-## Test site (Vercel)
+## Hosting
 
-- Princeton CAS rejects `*.vercel.app` addresses but accepts any `*.tigerapps.org` one. The site therefore needs a tigerapps.org name (for example `tigerretail-dev.tigerapps.org`): add it under Vercel → Domains, then ask TigerApps to add the DNS record Vercel shows.
-- Every key from the table goes in Vercel → Project → Settings → Environment Variables, with `APP_URL` set to that address.
-- Functions on the free plan stop after 5 minutes, so a very large slide deck may not finish importing there. Import it locally instead.
-- The listserv import runs once a day (`vercel.json`), because Vercel's free plan allows daily crons only.
+- Princeton CAS only accepts `*.tigerapps.org` addresses, so the hosted site lives on one.
