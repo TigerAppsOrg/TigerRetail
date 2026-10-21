@@ -5,6 +5,17 @@ Next.js on `127.0.0.1:3000`; nginx accepts requests for `retail.tigerapps.org`.
 Cloudflare proxies the hostname and terminates public HTTPS. Origin port 80 is
 restricted to Cloudflare's published address ranges by the EC2 security group.
 
+## Instance
+
+- Instance: `i-0d71f32bcadb310f8` (`tigerretail-web`), Ubuntu 24.04 ARM64.
+- Public IP: `18.213.245.94` (currently automatically assigned; do not stop/start
+  the instance without updating DNS and SSH instructions). Reboots and service
+  restarts retain this IP. An additional Elastic IP quota slot is requested.
+- Security group: `sg-05ba135eda0b12bee` (`tigerretail-web-sg`).
+- Release bucket: `tigerretail-deploy-104733724423-us-east-1` (private).
+- SSH host ED25519 fingerprint:
+  `SHA256:uTCsYwp7JwD6gmqg31P70N9/CMzw+R5Q+XpyA1BPjNs`.
+
 ## CI/CD
 
 Push to `main` to run lint, all unit tests, and a standalone Next.js build on an
@@ -48,7 +59,7 @@ Connect as `raj` using the private key corresponding to the public key supplied
 to TigerApps. Use the EC2 public IP rather than the Cloudflare-proxied web hostname.
 
 ```sh
-ssh -i ~/.ssh/id_ed25519 raj@<EC2_PUBLIC_IP>
+ssh -i ~/.ssh/id_ed25519 raj@18.213.245.94
 cd /opt/tigerretail/current
 journalctl -u tigerretail -f
 sudo systemctl restart tigerretail
@@ -74,7 +85,7 @@ Files:
 Each deploy runs only pending `db/migrations/*.sql` files using the app database
 role before switching the active release. It never seeds or resets the database.
 Each migration runs in its own transaction. The new server must pass
-`/api/health`, including a database query; otherwise the previous application
+`/api/health`, including required runtime configuration and a database query; otherwise the previous application
 release and environment are restored automatically.
 
 Database migrations are **not** reverted by an application rollback. Write
