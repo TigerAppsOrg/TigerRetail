@@ -1,11 +1,11 @@
-/* npm run setup: asks for the team database and Cloudflare R2 settings one at
+/* bun run setup: asks for the team database and S3 settings one at
    a time (secrets hidden as you type) and saves them to .env.local. Nothing is
    written until the end, and secrets are never printed back. */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { connect } from "node:net";
 import { createInterface } from "node:readline";
 import { Writable } from "node:stream";
-import { databaseUrl, masked, parseR2Account, upsertEnv } from "./env-file.mjs";
+import { databaseUrl, masked, upsertEnv } from "./env-file.mjs";
 
 const ENV_FILE = process.env.ENV_FILE ?? new URL("../.env.local", import.meta.url).pathname;
 
@@ -60,20 +60,17 @@ async function database() {
   return { url: databaseUrl({ host, port, database, username, password, ssl }), host: host.replace(/^[a-z]+:\/\//i, "").replace(/\/.*$/, ""), port };
 }
 
-async function r2() {
-  console.log("\n— Cloudflare R2 (photos) —");
-  console.log("From dash.cloudflare.com → R2. The API token needs Object Read & Write on the bucket.");
-  // the bucket's "S3 API" URL (Settings) carries both the account ID and the bucket name
-  const parsed = parseR2Account(await ask("Account ID, or paste the bucket's S3 API URL from its Settings"));
-  const account = parsed.account;
-  const bucket = parsed.bucket ?? (await ask("Bucket name", { def: "tigerretail" }));
-  if (parsed.bucket) console.log(`  account ${account}, bucket ${bucket}`);
-  const keyId = await ask("Access Key ID", { hidden: true });
-  const secret = await ask("Secret Access Key", { hidden: true });
-  const publicUrl = (await ask("Public bucket URL (Settings → Public access, like https://pub-….r2.dev)")).replace(/\/+$/, "");
-  if (!/^[a-f0-9]{32}$/i.test(account)) console.log("  note: Cloudflare account IDs are usually 32 letters and digits; double-check it.");
-  if (!/^https:\/\//.test(publicUrl)) throw new Error("The public bucket URL should start with https://");
-  return { R2_ACCOUNT_ID: account, R2_BUCKET: bucket, R2_ACCESS_KEY_ID: keyId, R2_SECRET_ACCESS_KEY: secret, R2_PUBLIC_URL: publicUrl };
+async function s3() {
+  console.log("\n— AWS S3 (photos) —");
+  console.log("Ask TigerApps for the bucket, CloudFront URL, and an AWS profile with photo access.");
+  console.log("Use aws sso login --profile <profile> before running the app. EC2 uses its instance role.");
+  const region = await ask("AWS region", { def: "us-east-1" });
+  const bucket = await ask("S3 bucket name");
+  const publicUrl = (await ask("CloudFront public URL (https://…cloudfront.net)")).replace(/\/+$/, "");
+  const profile = await ask("Local AWS profile (leave blank to use the default credential chain)");
+  if (!bucket) throw new Error("The S3 bucket name is required.");
+  if (!/^https:\/\//.test(publicUrl)) throw new Error("The public image URL should start with https://");
+  return { AWS_REGION: region, S3_BUCKET: bucket, S3_PUBLIC_URL: publicUrl, AWS_PROFILE: profile };
 }
 
 try {
@@ -85,7 +82,7 @@ try {
     console.log((await reachable(db.host, db.port)) ? "yes." : "no answer (wrong host/port, a firewall, or you need to be on Princeton's network or VPN). Saving it anyway.");
     values.DATABASE_URL = db.url;
   }
-  if (await yes("\nSet up Cloudflare R2 for photos?")) Object.assign(values, await r2());
+  if (await yes("\nSet up AWS S3 for photos?")) Object.assign(values, await s3());
   if (!Object.keys(values).length) {
     console.log("\nNothing to save.");
   } else {
@@ -96,7 +93,7 @@ try {
       const secret = /SECRET|KEY_ID|DATABASE_URL/.test(k);
       console.log(`  ${k} = ${secret ? masked(v) : v}`);
     }
-    console.log("\nRestart the dev server (Ctrl C, then npm run dev) so it picks these up.");
+    console.log("\nRestart the dev server (Ctrl C, then bun run dev) so it picks these up.");
   }
 } catch (e) {
   console.error(`\nStopped: ${e instanceof Error ? e.message : e}\nNothing was saved.`);

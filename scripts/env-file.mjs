@@ -1,4 +1,4 @@
-/* Pure helpers for `npm run setup` (scripts/setup-env.mjs): build the database
+/* Pure helpers for `bun run setup` (scripts/setup-env.mjs): build the database
    URL from its parts, and set keys in an env file without duplicating them. */
 
 /* postgresql://user:pass@host:5432/db?sslmode=require: the user, password and
@@ -29,15 +29,6 @@ export function upsertEnv(text, values) {
   }
   const out = lines.join("\n");
   return out.endsWith("\n") ? out : `${out}\n`;
-}
-
-/* The bucket's "S3 API" URL (R2 → bucket → Settings) has both the account ID
-   and the bucket name: https://<account>.r2.cloudflarestorage.com/<bucket>.
-   Anything else is taken as the account ID itself. */
-export function parseR2Account(input) {
-  const t = String(input ?? "").trim();
-  const m = t.match(/^https?:\/\/([a-f0-9]{32})\.(?:[a-z]+\.)?r2\.cloudflarestorage\.com(?:\/([^/?#]+))?/i);
-  return m ? { account: m[1], bucket: m[2] ?? null } : { account: t, bucket: null };
 }
 
 /* what to show for a value: secrets never in full */

@@ -7,7 +7,7 @@ export async function GET() {
   try {
     env.appUrl();
     env.sessionSecret();
-    env.r2();
+    env.s3();
     await sql()`select 1`;
     return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
   } catch {
