@@ -46,6 +46,11 @@ Everyone works on the same dev database and photo bucket, so:
 - Tell the team before you run `npm run migrate`, `npm run seed` or `npm run seed:clear`. They change everyone's data.
 - The e2e tests create `e2e-*` users and delete them when they finish.
 
-## Hosting
+## Hosted MVP (AWS)
 
-- Princeton CAS only accepts `*.tigerapps.org` addresses, so the hosted site lives on one.
+The deployment targets https://retail.tigerapps.org. Pushes to `main` run CI and
+then deploy to the dedicated EC2 instance once AWS provisioning is complete.
+See [AWS hosting](deploy/README.md) for SSH, secrets, release management, and
+shared database migration details.
+
+Princeton CAS requires the custom `*.tigerapps.org` hostname for sign-in.
