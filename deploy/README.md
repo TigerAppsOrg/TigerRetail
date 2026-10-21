@@ -8,9 +8,7 @@ restricted to Cloudflare's published address ranges by the EC2 security group.
 ## Instance
 
 - Instance: `i-0d71f32bcadb310f8` (`tigerretail-web`), Ubuntu 24.04 ARM64.
-- Public IP: `18.213.245.94` (currently automatically assigned; do not stop/start
-  the instance without updating DNS and SSH instructions). Reboots and service
-  restarts retain this IP. An additional Elastic IP quota slot is requested.
+- Elastic IP: `54.172.69.241` (retained across instance stop/start).
 - Security group: `sg-05ba135eda0b12bee` (`tigerretail-web-sg`).
 - Release bucket: `tigerretail-deploy-104733724423-us-east-1` (private).
 - SSH host ED25519 fingerprint:
@@ -77,7 +75,7 @@ Connect as `raj` using the private key corresponding to the public key supplied
 to TigerApps. Use the EC2 public IP rather than the Cloudflare-proxied web hostname.
 
 ```sh
-ssh -i ~/.ssh/id_ed25519 raj@18.213.245.94
+ssh -i ~/.ssh/id_ed25519 raj@54.172.69.241
 cd /opt/tigerretail/current
 journalctl -u tigerretail -f
 sudo systemctl restart tigerretail
