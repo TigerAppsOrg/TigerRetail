@@ -1,5 +1,5 @@
 /* End-to-end check of the listserv import, against the running dev server
-   and the team database and R2 bucket.
+   and the team database and S3 bucket.
 
      npm run dev            (in another terminal)
      npm run e2e:import

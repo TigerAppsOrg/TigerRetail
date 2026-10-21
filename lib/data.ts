@@ -1,6 +1,6 @@
 import "server-only";
 /* Data Access Layer: the only module that talks to the database (Postgres,
-   lib/db) and photo storage (R2, lib/storage). Callers pass the viewer's netid
+   lib/db) and photo storage (S3, lib/storage). Callers pass the viewer's netid
    from the verified session; every write re-checks the rules here, close to
    the data, rather than trusting what the page showed. */
 import { randomUUID } from "node:crypto";
