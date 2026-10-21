@@ -3,14 +3,14 @@
 
 export type Section =
   | "clothing"
-  | "accessories"
-  | "special occasions"
   | "dorm"
+  | "special occasions"
   | "school supplies"
+  | "jewelry"
   | "everything else";
 
-/* Apparel listings are women's or men's. Everything else is "misc", which is
-   also the third colour on the map. */
+/* Map colours: women's, men's, and "misc" for everything else (non-apparel,
+   and unisex apparel, which TigerRetail passes in as misc). */
 export type Dept = "women's" | "men's" | "misc";
 
 export interface Listing {

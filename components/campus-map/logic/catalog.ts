@@ -1,16 +1,17 @@
 import type { Dept, Recency, Section } from "../types";
 
-/* Same sections and order as the TigerRetail prototype. */
+/* Same sections and order as the TigerRetail wireframe (wireframe/index.html),
+   which is the source of truth for the catalog. */
 export const SECTIONS: [Section, string[]][] = [
-  ["clothing", ["tops", "bottoms", "dresses/rompers", "outerwear", "shoes"]],
-  ["accessories", ["bags", "jewelry", "hats", "belts & scarves", "sunglasses"]],
-  ["special occasions", ["lawnparties", "formals", "going out", "grad"]],
+  ["clothing", ["tops", "bottoms", "dresses/rompers", "outerwear", "shoes", "bags & accessories"]],
   ["dorm", ["furniture", "decoration", "essentials"]],
+  ["special occasions", ["lawnparties", "formals", "going out", "grad"]],
   ["school supplies", ["textbooks", "stationery", "electronics", "lab gear"]],
+  ["jewelry", ["earrings", "necklaces", "rings", "bracelets"]],
   ["everything else", ["everything else"]],
 ];
 
-export const APPAREL = new Set<Section>(["clothing", "accessories", "special occasions"]);
+export const APPAREL = new Set<Section>(["clothing", "special occasions"]);
 
 export const DEPTS: Dept[] = ["women's", "men's", "misc"];
 

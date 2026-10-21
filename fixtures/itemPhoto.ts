@@ -10,7 +10,7 @@ const PALETTES = [
 
 const GLYPH: Record<Section, string> = {
   clothing: "M70 60 50 72l10 22 10-6v72h60V88l10 6 10-22-20-12c-6 10-16 14-30 14S76 70 70 60z",
-  accessories: "M62 90h76l-8 80H70zM80 90c0-24 40-24 40 0",
+  jewelry: "M100 70c-30 0-44 22-44 46s20 44 44 44 44-20 44-44-14-46-44-46zM100 52l-12 18h24z",
   "special occasions": "M84 50h32l-6 30 30 90H60l30-90z",
   dorm: "M60 120h80v40H60zM66 160v18M134 160v18M70 120V90h60v30",
   "school supplies": "M58 64h56v112H58zM114 64h28v112h-28M70 84h32M70 100h32",
