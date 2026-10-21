@@ -27,7 +27,7 @@ export function ImportForms({ engineConfigured }: { engineConfigured: boolean })
         <h3 style={{ margin: 0 }}>search the listserv</h3>
         <p className="sub" style={{ margin: 0 }}>
           sale emails across the residential listservs: slides links, and sales written in the email with photos. the first run covers the last 30 days; after that each run picks up where the
-          last one ended. once deployed this also runs on its own three times a day.
+          last one ended. it doesn&rsquo;t run on its own yet. a search takes a few minutes; the result shows above the queue.
         </p>
         <button className="btn btn-outline" disabled={runPending}>
           {runPending ? "searching…" : "run now"}
