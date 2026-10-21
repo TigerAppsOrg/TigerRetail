@@ -1,6 +1,28 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "map", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 3000 }
+    {
+      "name": "app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "wireframe",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4000",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "wireframe"
+      ],
+      "port": 4000
+    }
   ]
 }

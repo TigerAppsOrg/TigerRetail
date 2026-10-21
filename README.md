@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TigerRetail
 
-## Getting Started
+Princeton's student marketplace. Next.js app, Princeton CAS sign-in, the TigerRetail development PostgreSQL database, and Cloudflare R2 for photos.
 
-First, run the development server:
+## Run it on your machine
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Install Node 22+ and Google Chrome (the e2e tests drive Chrome).
+2. `git clone https://github.com/TigerAppsOrg/TigerRetail.git && cd TigerRetail && npm install`
+3. `npm run setup` asks for the database and R2 keys one at a time and saves them to `.env.local`.
+4. Copy the remaining keys you need from `.env.example` into `.env.local` (see the table below).
+5. `npm run dev`, open http://localhost:3000 and sign in with your netid.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`.env.local` is gitignored. Never commit keys, and never paste them in Slack or GitHub.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Keys
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Key | Needed for | Where to get it |
+|---|---|---|
+| `DATABASE_URL` | everything | Ask Raj (shared dev database) |
+| `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_URL` | photos | Ask Raj for an R2 API token (Object Read & Write on bucket `tigerretail`) |
+| `SESSION_SECRET` | sign-in | Make your own: `openssl rand -base64 48` |
+| `APP_URL` | sign-in | `http://localhost:3000` |
+| `ADMIN_NETIDS` | the import review page (`/admin/imports`) | Your netid |
+| `ANTHROPIC_API_KEY` | reading sale slide decks | Your own key from console.anthropic.com |
+| `INBOX_ENGINE_URL`, `INBOX_ENGINE_TOKEN` | finding listserv sale emails | Ask TigerApps |
+| `CRON_SECRET` | `npm run import` | Make your own: `openssl rand -hex 24` |
+| `SENDGRID_API_KEY`, `MAIL_FROM` | sending seller invites | Ask Raj |
+| `INVITE_TEST_RECIPIENT` | sending seller invites | Your own `netid@princeton.edu`; every test invite goes here |
 
-## Learn More
+Only the first four rows are needed to run the app. Leave `INVITES_TO_SELLERS` unset: it sends invites to real sellers.
 
-To learn more about Next.js, take a look at the following resources:
+## Commands
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `npm test`: unit tests.
+- `npm run lint`: lint.
+- `npm run e2e`, `npm run e2e:import`, `npm run e2e:map`: browser tests. Run them with `npm run dev` going in another terminal.
+- `npm run migrate -- --status`: lists the database migrations that have been applied.
+- `npm run migrate`: applies new files from `db/migrations/`.
+- `npm run seed -- --owner <netid>`: adds the demo marketplace.
+- `npm run seed:clear`: removes the demo marketplace.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## The shared database
 
-## Deploy on Vercel
+Everyone works on the same dev database and photo bucket, so:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Tell the team before you run `npm run migrate`, `npm run seed` or `npm run seed:clear`. They change everyone's data.
+- The e2e tests create `e2e-*` users and delete them when they finish.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Test site (Vercel)
+
+- Princeton CAS rejects `*.vercel.app` addresses but accepts any `*.tigerapps.org` one. The site therefore needs a tigerapps.org name (for example `tigerretail-dev.tigerapps.org`): add it under Vercel → Domains, then ask TigerApps to add the DNS record Vercel shows.
+- Every key from the table goes in Vercel → Project → Settings → Environment Variables, with `APP_URL` set to that address.
+- Functions on the free plan stop after 5 minutes, so a very large slide deck may not finish importing there. Import it locally instead.
+- The listserv import runs once a day (`vercel.json`), because Vercel's free plan allows daily crons only.

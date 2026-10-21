@@ -8,13 +8,28 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "e2e": "node e2e/map.e2e.mjs"
+    "e2e:map": "node e2e/map-demo.e2e.mjs",
+    "e2e": "node e2e/flow.e2e.mjs",
+    "seed": "node scripts/seed.mjs",
+    "seed:clear": "node scripts/seed.mjs --clear",
+    "import": "node scripts/import.mjs",
+    "e2e:import": "node e2e/import.e2e.mjs",
+    "setup": "node scripts/setup-env.mjs",
+    "migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "@arcgis/core": "^5.1.27",
+    "@aws-sdk/client-s3": "^3.1155.0",
+    "fflate": "^0.8.3",
+    "iron-session": "^9.0.1",
     "next": "16.4.0",
+    "postgres": "^3.4.9",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1",
+    "sharp": "^0.35.5",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^24.19.1",

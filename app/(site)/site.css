@@ -1,0 +1,153 @@
+/* App-only additions on top of wireframe.css: things the wireframe didn't
+   need because it was one static page. */
+
+/* the nav sticks as a whole (wireframe.css makes .nav sticky inside its own box) */
+.nav-holder{position:sticky;top:0;z-index:40}
+.site-shell{min-height:100dvh;display:flex;flex-direction:column}
+
+/* the wireframe used <button>s for navigation; here they're real links, so
+   drop the default underline (.crumb-link keeps its own) */
+:where(.wf) a{text-decoration:none}
+:where(.wf) p a,:where(.wf) .empty a,:where(.wf) .note a{text-decoration:underline;text-underline-offset:2px}
+
+/* real photos inside the wireframe's photo tiles */
+.ph>img,.shot>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.card{color:inherit;text-decoration:none}
+
+/* the map fills what's left under the nav */
+.map-fill{flex:1;min-height:0;position:relative;display:flex;flex-direction:column}
+.map-fill>*{flex:1}
+
+/* form errors, in the wireframe's "needs attention" colour */
+.err{font-size:12.5px;color:var(--danger);margin:4px 0 0}
+.errbox{border:1px solid var(--danger);background:var(--tiger-soft);border-radius:10px;padding:11px 14px;font-size:13.5px;color:var(--ink-2);margin:0 0 16px}
+.itemcard.bad{border-color:var(--danger)}
+
+/* item page: thumbnail strip under the cover photo */
+.thumbs{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.thumbs button{width:56px;aspect-ratio:4/5;border-radius:8px;overflow:hidden;position:relative;background:var(--ph);outline:1px solid var(--line)}
+.thumbs button.on{outline:2px solid var(--tiger)}
+.thumbs img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+
+/* seller's offers on the item page */
+.offers{margin-top:22px}
+.offers .offrow{border:1px solid var(--line);background:var(--surface);flex-wrap:wrap}
+.contactcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:16px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.contactcard b{font-weight:600}
+
+/* "where am I": the current section reads as selected (ink text, orange underline) */
+.cat-btn.active{color:var(--ink);font-weight:600;text-decoration:underline;text-decoration-color:var(--tiger);text-decoration-thickness:2px;text-underline-offset:7px}
+
+/* One accent colour. Orange is reserved for actions (+ sell, make an offer,
+   publish) and the current-section underline; selections and prices are ink. */
+.card-name span,.price{color:var(--ink)}
+.chipbtn.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.ms-btn.on{background:var(--surface);border-color:var(--ink);color:var(--ink)}
+.ms-btn.on .ms-label{color:var(--muted)}
+.pill{background:var(--surface-2);color:var(--ink)}
+.ms-opt.on{color:var(--ink)}
+.ms-opt input,.opt input,.payrow input{accent-color:var(--ink)}
+
+/* phones: the category row is one sideways-scrolling strip that fades at the edge */
+@media(max-width:900px){
+  .catbar-in{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}
+  .catbar-in::-webkit-scrollbar{display:none}
+  .catbar-in .cat-btn{flex:none}
+}
+
+/* segmented control: department switch, list | map */
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-pill);padding:3px;gap:2px;flex:none}
+.seg>*{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--r-pill);font-size:13.5px;color:var(--ink-2);white-space:nowrap}
+.seg>*:hover{color:var(--ink)}
+.seg>.on{background:var(--ink);color:var(--paper);font-weight:500}
+.seg svg{width:15px;height:15px}
+.rail-controls .count{padding:0;margin-left:auto}
+.rail-controls .fsel.sortsel{margin-left:0}
+.more-panel{min-width:240px;padding:10px;display:flex;flex-direction:column;gap:10px}
+.more-panel h4{margin:4px 6px 0;font-size:12px;font-weight:500;color:var(--muted);text-transform:lowercase}
+
+/* map view inside a section */
+.map-embed{height:calc(100dvh - 300px);min-height:520px;display:flex;border-top:1px solid var(--line-2)}
+.map-embed>*{flex:1}
+@media(max-width:560px){
+  .subnav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .subnav::-webkit-scrollbar{display:none}
+  .subnav .chipbtn{flex:none}
+}
+
+/* one-tap offer panel */
+.sheet{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-lift);padding:16px;display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.sheet-head{display:flex;align-items:center;justify-content:space-between}
+.amts{display:flex;gap:8px;flex-wrap:wrap}
+.amts button{border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-size:14px;line-height:1.2;text-align:center;background:var(--surface)}
+.amts button:hover{border-color:var(--ink-2)}
+.amts button.on{border-color:var(--ink);background:var(--ink);color:var(--paper)}
+.amts small{display:block;font-size:11px;opacity:.7}
+
+/* sell: photo drop zone, contact summary, optional details */
+.drop{border:2px dashed var(--tiger);background:var(--tiger-soft);border-radius:16px;padding:46px 20px;display:grid;place-items:center;gap:8px;text-align:center;color:var(--tiger);cursor:pointer;transition:filter .15s}
+.drop:hover,.drop.over{filter:brightness(.96)}
+.drop.over{border-style:solid}
+.drop svg{width:28px;height:28px}
+.drop b{font-size:17px;font-weight:600}
+.drop.small{padding:22px 20px;margin-top:4px}
+.drop.small b{font-size:15px}
+.itemcard.over{outline:2px dashed var(--tiger);outline-offset:3px}
+.contactline{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 16px;font-size:14px;color:var(--ink-2)}
+.contactline>span{flex:1;min-width:0}
+.contactbox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:20px;display:flex;flex-direction:column;gap:18px}
+.guess{font-size:12.5px;color:var(--good);margin:-4px 0 6px}
+.more-details{display:inline-flex;align-items:center;gap:6px;color:var(--ink-2);font-size:13.5px;font-weight:500;margin-top:4px;text-align:left}
+.more-details:hover{color:var(--ink)}
+.more-details svg{width:14px;height:14px}
+
+/* profile */
+.avatar{display:inline-grid;place-items:center;flex:none;border-radius:50%;overflow:hidden;background:var(--tiger-soft);color:var(--tiger);font-weight:600;letter-spacing:.02em;position:relative}
+.avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.avatar-edit{display:flex;align-items:center;gap:18px}
+.pf-sub{font-size:17px;font-weight:600;margin:10px 0 0;padding-top:18px;border-top:1px solid var(--line-2)}
+.me-link{display:inline-flex;align-items:center;padding:3px;border-radius:999px}
+.me-link:hover{background:var(--surface-2)}
+.me-link.active .avatar{outline:2px solid var(--ink);outline-offset:2px}
+.person{display:inline-flex;align-items:center;gap:8px;vertical-align:middle}
+
+/* messaging */
+.inbox{display:flex;flex-direction:column;gap:8px;margin-top:18px;max-width:760px}
+.inbox-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:14px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-card);background:var(--surface);color:inherit}
+.inbox-row:hover{border-color:var(--ink-2)}
+.inbox-row.unread{border-color:var(--ink)}
+.inbox-row.unread .inbox-last{color:var(--ink);font-weight:500}
+.inbox-mid{min-width:0}
+.inbox-top{display:flex;gap:6px;align-items:baseline;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inbox-last{font-size:13.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inbox-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;font-size:12px}
+.inbox-right .dot{background:var(--tiger)}
+.inbox-thumb{width:44px;aspect-ratio:4/5;border-radius:8px;overflow:hidden;position:relative;background:var(--ph)}
+.inbox-thumb img,.convo-item img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+@media(max-width:560px){.inbox-thumb{display:none}.inbox-row{grid-template-columns:auto 1fr auto}}
+.convo{max-width:760px;margin:0 auto;display:flex;flex-direction:column;min-height:calc(100dvh - 190px)}
+.convo-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--line-2)}
+.convo-head .tool{padding-left:0}
+.convo-item{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13.5px;color:inherit}
+.convo-item img{position:static;width:38px;height:48px;border-radius:7px}
+.convo-item>span{display:flex;flex-direction:column;line-height:1.3}
+.thread{flex:1;display:flex;flex-direction:column;gap:6px;padding:18px 0;overflow-y:auto}
+.msg{max-width:72%;padding:9px 13px;border-radius:16px;font-size:14.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.mine{margin-left:auto;background:var(--ink);color:var(--paper);border-bottom-right-radius:5px}
+.msg.theirs{margin-right:auto;background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:5px}
+.msg-time{text-align:center;font-size:11.5px;color:var(--faint);margin:10px 0 4px}
+.composer{position:sticky;bottom:0;display:flex;gap:10px;align-items:flex-end;padding:12px 0 18px;background:var(--paper);border-top:1px solid var(--line-2)}
+.composer textarea.inp{min-height:44px;max-height:140px;resize:none;border-radius:22px;padding:11px 16px}
+
+/* phones: nav links become icons (labels stay for screen readers) */
+@media(max-width:560px){
+  .nav-right .icon-lbl>span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .nav-right{gap:4px}
+  .nav-right .icon-lbl{padding:8px}
+  .nav-right .icon-lbl .badge{position:absolute;top:0;right:-2px}
+}
+
+/* listserv imports */
+.review-deck{border-top:1px solid var(--line-2);padding-top:18px}
+.review-deck .card{gap:8px}
+.fromlist{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13.5px;color:var(--ink-2);display:flex;flex-direction:column;gap:8px}

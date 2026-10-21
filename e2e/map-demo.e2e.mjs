@@ -3,14 +3,14 @@
    screenshot of every view.
 
      npm run dev            (in another terminal)
-     npm run e2e            (SHOTS=<dir> to change where screenshots go)
+     npm run e2e:map        (SHOTS=<dir> to change where screenshots go)
 */
 import { chromium } from "playwright-core";
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const URL = process.env.URL ?? "http://localhost:3000";
+const URL = process.env.URL ?? "http://localhost:3000/dev/map-demo";
 const SHOTS = process.env.SHOTS ?? join(homedir(), "Desktop", "UX screenshots", "TigerRetail", "map");
 mkdirSync(SHOTS, { recursive: true });
 
@@ -143,7 +143,8 @@ async function setListings(page, n) {
   await page.getByRole("dialog").waitFor();
   await page.getByRole("button", { name: "Walk here" }).click();
   const summary = page.locator("[class*=summary]");
-  await summary.waitFor({ timeout: 20_000 }).catch(() => {});
+  // Princeton's routing server can take 20s+ late in this run (after the stress tests); we test that it solves, not its speed
+  await summary.waitFor({ timeout: 45_000 }).catch(() => {});
   const stext = (await summary.count()) ? await summary.textContent() : "";
   check(/\d+ min/.test(stext), `walking route solved: "${stext.trim()}"`);
   check((await page.locator("[class*=steps] li").count()) > 2, "turn-by-turn steps listed");
@@ -159,11 +160,11 @@ async function setListings(page, n) {
   const panel = page.getByRole("complementary", { name: "Map filters" });
 
   await panel.getByRole("button", { name: "clothing", exact: true }).click();
-  await panel.getByRole("button", { name: "accessories", exact: true }).click();
+  await panel.getByRole("button", { name: "jewelry", exact: true }).click();
   const clothingTypes = panel.getByRole("group", { name: "clothing" });
-  const accessoryTypes = panel.getByRole("group", { name: "accessories" });
-  check((await clothingTypes.getByRole("button").allTextContents()).join(",") === "tops,bottoms,dresses/rompers,outerwear,shoes", "clothing types grouped under 'clothing'");
-  check((await accessoryTypes.getByRole("button").allTextContents()).includes("jewelry"), "accessory types grouped separately under 'accessories'");
+  const jewelryTypes = panel.getByRole("group", { name: "jewelry" });
+  check((await clothingTypes.getByRole("button").allTextContents()).join(",") === "tops,bottoms,dresses/rompers,outerwear,shoes,bags & accessories", "clothing types grouped under 'clothing'");
+  check((await jewelryTypes.getByRole("button").allTextContents()).includes("earrings"), "jewelry types grouped separately under 'jewelry'");
 
   await panel.getByRole("button", { name: /^Butler/ }).click();
   await panel.getByRole("button", { name: /^Forbes/ }).click();

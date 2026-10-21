@@ -49,11 +49,11 @@ const TITLES: Record<string, string[]> = {
   "dresses/rompers": ["sundress", "black mini dress", "floral romper"],
   outerwear: ["puffer jacket", "reunions blazer", "wool peacoat", "rain shell"],
   shoes: ["white sneakers", "running shoes", "formal heels", "chelsea boots", "loafers"],
-  bags: ["tote bag", "leather backpack", "crossbody bag"],
-  jewelry: ["gold hoops", "pearl necklace", "silver rings set"],
-  hats: ["tiger beanie", "baseball cap"],
-  "belts & scarves": ["orange scarf", "leather belt"],
-  sunglasses: ["ray-ban wayfarers", "cat-eye sunglasses"],
+  "bags & accessories": ["tote bag", "leather backpack", "tiger beanie", "orange scarf", "ray-ban wayfarers"],
+  earrings: ["gold hoops", "pearl studs"],
+  necklaces: ["pearl necklace", "gold chain necklace"],
+  rings: ["silver rings set", "signet ring"],
+  bracelets: ["beaded bracelet", "tennis bracelet"],
   lawnparties: ["lawnparties sundress", "pastel button-down"],
   formals: ["black formal dress", "navy suit", "satin slip dress"],
   "going out": ["sparkly top", "leather skirt"],
@@ -69,7 +69,7 @@ const TITLES: Record<string, string[]> = {
 };
 
 const SECTION_WEIGHT: [Section, number][] = [
-  ["clothing", 5], ["accessories", 2], ["special occasions", 2], ["dorm", 4], ["school supplies", 2], ["everything else", 1],
+  ["clothing", 6], ["dorm", 4], ["special occasions", 2], ["school supplies", 2], ["jewelry", 1], ["everything else", 1],
 ];
 const weightedSection = () => {
   let r = rnd() * SECTION_WEIGHT.reduce((a, [, w]) => a + w, 0);

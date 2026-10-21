@@ -70,7 +70,8 @@ export function SellerGallery(p: Props) {
         </span>
         <div>
           <h3>
-            {seller.name} <span className={s.gmeta}>· {seller.id}</span>
+            {/* a listserv sale nobody has claimed is pinned as "sale:<id>": no netid to show */}
+            {seller.name} <span className={s.gmeta}>· {seller.id.startsWith("sale:") ? "from the listserv" : seller.id}</span>
           </h3>
           <div className={s.gmeta}>
             {building.name} · {tidyCollege(building.college)}
@@ -107,7 +108,11 @@ export function SellerGallery(p: Props) {
         ) : (
           <div className={s.lock}>
             <span aria-hidden>🔒</span>
-            <span>Room directions are shared once {seller.name} accepts your offer.</span>
+            <span>
+              {seller.id.startsWith("sale:")
+                ? "From a listserv sale: open an item for how the post says to reach them."
+                : `Room directions are shared once ${seller.name} accepts your offer.`}
+            </span>
           </div>
         )}
       </div>
