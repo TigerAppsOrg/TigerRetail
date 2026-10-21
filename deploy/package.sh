@@ -5,7 +5,7 @@ release_dir="$(mktemp -d)"
 trap 'rm -rf "$release_dir"' EXIT
 cp -a .next/standalone/. "$release_dir/"
 cp -a .next/static "$release_dir/.next/static"
-cp -a public "$release_dir/public"
+if [[ -d public ]]; then cp -a public "$release_dir/public"; fi
 mkdir -p "$release_dir/scripts"
 cp scripts/migrate.mjs "$release_dir/scripts/"
 cp -a db "$release_dir/db"
