@@ -66,8 +66,10 @@ on EC2; Raj can run imports through the admin page after configuring its keys.
   `aws sso login --profile <profile>`. Do not set `AWS_PROFILE` on EC2.
 
 Existing database image paths keep the same `listing-photos/` and `avatars/`
-prefixes. Copy referenced R2 objects before changing the live image URL; the
-storage switch does not rewrite database rows or delete R2 objects.
+prefixes. On 2026-10-21, all 406 referenced R2 images (~106 MB) were copied
+and verified through CloudFront before DNS cutover. Database paths and source
+R2 objects were preserved. Local developers must pull this change and use the
+S3 settings in `.env.example` so new images go to the same bucket as the MVP.
 
 ## SSH and operations
 

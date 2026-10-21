@@ -1,5 +1,5 @@
 /* End-to-end check of the app against the running dev server and the team
-   database and R2 bucket in .env.local. Drives two people through the main flow
+   database and S3 bucket in .env.local. Drives two people through the main flow
    (onboard → sell a batch → browse/filter → offer → accept → contact → sold)
    and screenshots each view.
 

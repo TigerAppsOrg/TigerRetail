@@ -1,5 +1,5 @@
 /* Fill the dev database with the wireframe's own demo marketplace, so the app
-   can be seen with data in it. Dev only: it writes with the database and R2
+   can be seen with data in it. Dev only: it writes with the database and S3
    settings in .env.local and never runs in the app.
 
      npm run seed -- --owner <netid>   seed (the wireframe's "my listings" go to <netid>)
