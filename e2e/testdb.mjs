@@ -1,4 +1,4 @@
-/* Test and seed scripts' direct line to the TigerRetail database and the R2
+/* Test and seed scripts' direct line to the TigerRetail database and the S3
    photo bucket (the app itself goes through lib/db and lib/storage). */
 import { createRequire } from "node:module";
 import postgres from "postgres";
@@ -32,17 +32,13 @@ export async function insert(table, rowOrRows) {
   return db`insert into ${db(table)} ${db(rows)} returning *`;
 }
 
-const r2 = new S3Client({
-  region: "auto",
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: { accessKeyId: process.env.R2_ACCESS_KEY_ID, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY },
-});
-export const photoUrl = (bucket, path) => `${process.env.R2_PUBLIC_URL.replace(/\/+$/, "")}/${bucket}/${path}`;
+const s3 = new S3Client({ region: process.env.AWS_REGION });
+export const photoUrl = (bucket, path) => `${process.env.S3_PUBLIC_URL.replace(/\/+$/, "")}/${bucket}/${path}`;
 export async function putPhoto(bucket, path, bytes, contentType) {
-  await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET, Key: `${bucket}/${path}`, Body: bytes, ContentType: contentType }));
+  await s3.send(new PutObjectCommand({ Bucket: process.env.S3_BUCKET, Key: `${bucket}/${path}`, Body: bytes, ContentType: contentType }));
 }
 export async function removePhotos(bucket, paths) {
   for (let i = 0; i < paths.length; i += 1000) {
-    await r2.send(new DeleteObjectsCommand({ Bucket: process.env.R2_BUCKET, Delete: { Objects: paths.slice(i, i + 1000).map((p) => ({ Key: `${bucket}/${p}` })), Quiet: true } }));
+    await s3.send(new DeleteObjectsCommand({ Bucket: process.env.S3_BUCKET, Delete: { Objects: paths.slice(i, i + 1000).map((p) => ({ Key: `${bucket}/${p}` })), Quiet: true } }));
   }
 }

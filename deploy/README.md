@@ -29,8 +29,9 @@ trusts only `TigerAppsOrg/TigerRetail` on `refs/heads/main`. Repository variable
 - `AWS_DEPLOY_ROLE_ARN`: the dedicated `TigerRetailGitHubDeployRole` ARN.
 - `EC2_INSTANCE_ID`: the `tigerretail-web` instance ID.
 
-The EC2 role can read only this app's release prefix and production environment,
-plus the standard Systems Manager permissions.
+The EC2 role can read this app's release prefix and production environment,
+and read/write/delete objects under the photo bucket's `listing-photos/` and
+`avatars/` prefixes, plus the standard Systems Manager permissions.
 
 Dependencies for CI use `bun.lock`; install with `bun install --frozen-lockfile`.
 Node 22 runs both the build and the deployed server. If dependencies change,
@@ -44,14 +45,31 @@ mode 640). It is linked as `.env.local` in each release for the migration script
 No runtime credentials are included in the GitHub build or release artifact.
 
 Required values: `APP_URL=https://retail.tigerapps.org`, `SESSION_SECRET`,
-`DATABASE_URL`, and the five R2 settings from `.env.example`. The MVP uses the
-existing `tigerretail_dev` database and shared R2 bucket, so local changes affect
-the hosted MVP too. Optional import and mail keys are listed in `.env.example`.
+`DATABASE_URL`, `AWS_REGION`, `S3_BUCKET`, and `S3_PUBLIC_URL` from `.env.example`.
+The MVP uses the existing `tigerretail_dev` database and shared S3 photo bucket,
+so local changes affect the hosted MVP too. Optional import and mail keys are listed in `.env.example`.
 `INVITES_TO_SELLERS` remains unset until explicitly enabled by the team.
 
 Changing the SSM parameter takes effect on the next deployment. Do not edit the
 checked-in example to add real credentials. No automatic import cron is enabled
 on EC2; Raj can run imports through the admin page after configuring its keys.
+
+## Photo storage
+
+- S3 bucket: `tigerretail-photos-104733724423-us-east-1` (`us-east-1`).
+- Public image URL: `https://d1ugkt2f7zwiiq.cloudfront.net`.
+- CloudFront distribution: `E2HAM2BKNI5FOA`, using signed Origin Access Control.
+- The bucket blocks public access. Only CloudFront can serve anonymous reads;
+  the EC2 role handles writes. The app needs no static AWS access keys.
+- S3 versioning retains overwritten/deleted versions for 30 days. CloudFront
+  can continue serving cached deleted photos until their cache TTL expires;
+  invalidate the affected path for urgent removal.
+- Local developers set `AWS_PROFILE` to an authorized AWS CLI profile and run
+  `aws sso login --profile <profile>`. Do not set `AWS_PROFILE` on EC2.
+
+Existing database image paths keep the same `listing-photos/` and `avatars/`
+prefixes. Copy referenced R2 objects before changing the live image URL; the
+storage switch does not rewrite database rows or delete R2 objects.
 
 ## SSH and operations
 
