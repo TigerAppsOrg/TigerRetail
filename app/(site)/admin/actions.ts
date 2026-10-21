@@ -3,9 +3,10 @@
    the admin list itself: a Server Action is a public endpoint. */
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { approve, isAdmin, reject, sendInvite } from "@/lib/importer/admin";
-import { importDeck, runListservImport } from "@/lib/importer/importer";
+import { finishListservRun, readDeck, startDeck, startListservRun } from "@/lib/importer/importer";
 import { deckIdsIn } from "@/lib/importer/rules";
 
 async function requireAdmin() {
@@ -16,12 +17,16 @@ async function requireAdmin() {
 
 export type ImportState = { message?: string; error?: string } | undefined;
 
+/* Reading decks takes minutes, longer than Cloudflare keeps a request open, so
+   these start the work, answer at once, and finish it after responding. The
+   imports page shows what's still going and refreshes itself until it's done. */
+
 /* paste a deck link (works without InboxEngine) */
 export async function importLinkAction(_: ImportState, f: FormData): Promise<ImportState> {
   await requireAdmin();
   const [deckId] = deckIdsIn([String(f.get("url") ?? "").trim()]);
   if (!deckId) return { error: "That isn't a Google Slides link." };
-  const r = await importDeck(deckId, {
+  const email = {
     messageId: null,
     subject: String(f.get("subject") ?? "").trim(),
     text: "",
@@ -29,22 +34,21 @@ export async function importLinkAction(_: ImportState, f: FormData): Promise<Imp
     authorName: String(f.get("authorName") ?? "").trim() || null,
     authorEmail: String(f.get("authorEmail") ?? "").trim() || null,
     sentAt: null,
-  });
+  };
+  const started = await startDeck(deckId, email);
+  if ("skipped" in started) return { message: `Already imported: ${started.skipped.detail}` };
+  after(() => readDeck(started.sourceId, deckId, email));
   revalidatePath("/admin/imports");
-  return r.status === "failed"
-    ? { error: `Couldn't import that deck: ${r.detail}` }
-    : { message: `${r.status === "skipped" ? "Already imported" : "Imported"}: ${r.detail}` };
+  return { message: "Reading the deck. Its items show up below when it's done; a big deck takes a few minutes." };
 }
 
 export async function runNowAction(): Promise<ImportState> {
   await requireAdmin();
   try {
-    const r = await runListservImport();
+    const run = await startListservRun();
+    after(() => finishListservRun(run));
     revalidatePath("/admin/imports");
-    const created = [...r.decks, ...r.emailSales].reduce((n, d) => n + d.created, 0);
-    return {
-      message: `Checked ${r.emails} sale emails since ${new Date(r.since).toLocaleDateString()}: ${r.decks.length} decks, ${r.emailSales.length} sales written in the email, ${created} items for review.`,
-    };
+    return { message: "Searching the listserv. The result shows above the queue when it's done." };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }

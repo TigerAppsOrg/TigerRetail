@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { requireUser } from "@/lib/auth";
 import { isAdmin, recentRuns, reviewQueue } from "@/lib/importer/admin";
+import { olderThan, STALE_PENDING_MS, STALE_RUN_MS } from "@/lib/importer/importer";
 import { netidFromEmail } from "@/lib/importer/rules";
 import { formatCents } from "@/lib/rules";
+import { AutoRefresh } from "../../_components/AutoRefresh";
 import { reviewAction } from "../actions";
 import { ImportForms, InviteButton } from "./ImportForms";
 
@@ -30,8 +32,13 @@ async function Imports() {
   const [queue, runs] = await Promise.all([reviewQueue(), recentRuns()]);
   const engineConfigured = !!(process.env.INBOX_ENGINE_URL && process.env.INBOX_ENGINE_TOKEN);
   const waiting = queue.reduce((n, q) => n + q.items.length, 0);
+  // reads and searches finish in the background; keep the page current until they're done
+  const lastRun = runs[0];
+  const runGoing = !!lastRun && !lastRun.finished_at && !olderThan(lastRun.started_at as string, STALE_RUN_MS);
+  const reading = queue.some(({ source }) => source.status === "pending" && !olderThan(source.createdAt, STALE_PENDING_MS));
   return (
     <>
+      {(runGoing || reading) && <AutoRefresh />}
       <h1 className="sec-title">listserv imports</h1>
       <p className="sub" style={{ marginTop: 4 }}>
         items from sale decks, and from sales written in an email with photos, wait here until you approve them. approving one publishes it with the
@@ -45,7 +52,7 @@ async function Imports() {
       {runs.length > 0 && (
         <p className="sub">
           last run {new Date(runs[0].started_at as string).toLocaleString("en-US", { timeZone: "America/New_York" }).toLowerCase()}:{" "}
-          {String(runs[0].summary ?? (runs[0].finished_at ? "" : "still running"))}
+          {String(lastRun.summary ?? (lastRun.finished_at ? "" : runGoing ? "still running…" : "cut off before it finished (the server restarted); run it again"))}
         </p>
       )}
       <h2 className="sec-title" style={{ fontSize: 20, margin: "18px 0 10px" }}>
@@ -70,7 +77,9 @@ async function Imports() {
                 )}
               </span>
             </div>
-            <span className={`ostat ${source.status === "done" ? "accepted" : ""}`}>{source.status}</span>
+            <span className={`ostat ${source.status === "done" ? "accepted" : ""}`}>
+              {source.status === "pending" ? (!olderThan(source.createdAt, STALE_PENDING_MS) ? "reading…" : "cut off") : source.status}
+            </span>
           </div>
           {source.error && <p className={source.status === "failed" ? "err" : "sub"}>{source.status === "failed" ? source.error : `skipped: ${source.error}`}</p>}
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 6 }}>

@@ -43,7 +43,9 @@ export { IMPORT_ACCOUNT };
 const FIRST_RUN_DAYS = 30;
 const MAX_PDF_BYTES = 200 * 1024 * 1024; // the Files API takes up to 500 MB; anything near this is not a sale deck
 const MAX_PPTX_BYTES = 500 * 1024 * 1024; // photo-heavy decks export big: a real 98-slide one was 207 MB
-const STALE_PENDING_MS = 15 * 60_000; // a deck "pending" this long was cut off (the server died mid-read)
+/* started more than `ms` ago (work with no finish that old was cut off) */
+export const olderThan = (iso: string, ms: number) => Date.now() - new Date(iso).getTime() > ms;
+export const STALE_PENDING_MS = 15 * 60_000; // a deck "pending" this long was cut off (the server died mid-read)
 const MAX_PHOTOS_PER_ITEM = 4;
 const MAX_PHOTOS_PER_SLIDE = 12;
 const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
@@ -194,15 +196,23 @@ const isRetryable = (r: Row) =>
 /* ---- one deck ---- */
 
 export async function importDeck(deckId: string, email: EmailMeta, owner?: User): Promise<DeckResult> {
+  const started = await startDeck(deckId, email, owner);
+  return "skipped" in started ? started.skipped : readDeck(started.sourceId, deckId, email, owner);
+}
+
+/* The quick half of an import: skip a deck we already have, or record it as
+   "pending". readDeck is the slow half (minutes for a big deck), so a page can
+   start a read, answer right away, and let readDeck finish in the background. */
+export async function startDeck(deckId: string, email: EmailMeta, owner?: User): Promise<{ skipped: DeckResult } | { sourceId: string }> {
   const [existing] = await step("find deck", () => sql()<Row[]>`select id, status, author_email, created_at from import_sources where deck_id = ${deckId}`);
   if (existing && !isRetryable(existing)) {
     // first seen in a digest (no author); this email names who posted it, so they can claim it
     if (!existing.author_email && email.authorEmail) {
       const credit = { author_name: email.authorName, author_email: email.authorEmail.toLowerCase(), subject: email.subject, message_id: email.messageId, sent_at: email.sentAt };
       await step("credit deck author", () => sql()`update import_sources set ${sql()(credit)} where id = ${existing.id as string}`);
-      return { deckId, status: "skipped", detail: "already imported; credited to its author", created: 0 };
+      return { skipped: { deckId, status: "skipped", detail: "already imported; credited to its author", created: 0 } };
     }
-    return { deckId, status: "skipped", detail: "already imported", created: 0 };
+    return { skipped: { deckId, status: "skipped", detail: "already imported", created: 0 } };
   }
   if (existing) await step("clear failed attempt", () => sql()`delete from import_sources where id = ${existing.id as string}`);
 
@@ -218,6 +228,11 @@ export async function importDeck(deckId: string, email: EmailMeta, owner?: User)
     submitted_by: owner?.netid ?? null,
   };
   const [source] = await step("record deck", () => sql()<Row[]>`insert into import_sources ${sql()(record)} returning id`);
+  return { sourceId: source.id as string };
+}
+
+export async function readDeck(sourceId: string, deckId: string, email: EmailMeta, owner?: User): Promise<DeckResult> {
+  const source = { id: sourceId };
   const uploaded: string[] = [];
   try {
     const [pdf, pptx] = await Promise.all([fetchExport(deckId, "pdf", "application/pdf"), fetchExport(deckId, "pptx", "application/vnd.openxmlformats")]);
@@ -281,41 +296,39 @@ export async function importDeck(deckId: string, email: EmailMeta, owner?: User)
 
 /* ---- a seller's own deck, pasted on the sell page ---- */
 
-/* Read a deck the seller pasted into their own drafts, ready for them to check
-   and post. A deck already here goes to its page if it's theirs (pasted
-   before, or imported from their listserv email, which they can claim). */
-export async function importOwnDeck(deckId: string, user: User): Promise<{ sourceId: string } | { error: string }> {
+/* Start reading a deck the seller pasted into their own drafts, ready for them
+   to check and post. A deck already here goes to its page if it's theirs
+   (pasted before, or imported from their listserv email, which they can claim).
+   A new deck comes back with `read`, the slow part, for the caller to run after
+   answering: the sale page says "reading" until it's done, or why it failed. */
+export async function startOwnDeck(deckId: string, user: User): Promise<{ sourceId: string; read?: () => Promise<void> } | { error: string }> {
   const [existing] = await step("find deck", () => sql()<Row[]>`
     select id, status, submitted_by, author_email, created_at from import_sources where deck_id = ${deckId}`);
-  if (existing && existing.status === "pending" && !isRetryable(existing)) {
-    return { error: "That deck is being read right now. Give it a minute, then paste it again." };
-  }
   if (existing && !isRetryable(existing)) {
     const theirs = existing.submitted_by === user.netid || netidFromEmail(existing.author_email as string | null) === user.netid;
-    return theirs ? { sourceId: existing.id as string } : { error: "That deck is already on TigerRetail, under someone else's name." };
-  }
-  const r = await importDeck(
-    deckId,
-    { messageId: null, subject: "", text: "", listserv: null, authorName: user.displayName, authorEmail: user.email, sentAt: null },
-    user,
-  );
-  // nothing to keep or retry: they see why, and can paste it again
-  const forget = async () => {
-    if (r.sourceId) await step("clear deck", () => sql()`delete from import_sources where id = ${r.sourceId!}`);
-  };
-  if (r.status === "failed") {
-    await forget();
+    if (theirs) return { sourceId: existing.id as string };
     return {
-      error: /shared publicly/.test(r.detail)
-        ? "That deck isn't shared publicly. In Google Slides, click Share, set General access to “Anyone with the link”, and try again."
-        : `Couldn't read that deck: ${r.detail}`,
+      error: existing.status === "pending" ? "That deck is being read right now. Give it a minute, then paste it again." : "That deck is already on TigerRetail, under someone else's name.",
     };
   }
-  if (!r.created) {
-    await forget();
-    return { error: `Claude didn't find anything to post in that deck${r.detail.includes("skipped") ? ` (${r.detail.replace(/^0 for review \(skipped (.*)\)$/, "skipped $1")})` : ""}.` };
-  }
-  return { sourceId: r.sourceId! };
+  const email: EmailMeta = { messageId: null, subject: "", text: "", listserv: null, authorName: user.displayName, authorEmail: user.email, sentAt: null };
+  const started = await startDeck(deckId, email, user);
+  if ("skipped" in started) return { error: "That deck is being read right now. Give it a minute, then paste it again." }; // someone pasted it a moment before
+  const { sourceId } = started;
+  const read = async () => {
+    const r = await readDeck(sourceId, deckId, email, user);
+    const why =
+      r.status === "failed"
+        ? /shared publicly/.test(r.detail)
+          ? "That deck isn't shared publicly. In Google Slides, click Share, set General access to “Anyone with the link”, and paste it again."
+          : `Couldn't read that deck: ${r.detail}`
+        : !r.created
+          ? `Claude didn't find anything to post in that deck${r.detail.includes("skipped") ? ` (${r.detail.replace(/^0 for review \(skipped (.*)\)$/, "skipped $1")})` : ""}.`
+          : null;
+    // the sale page shows why; pasting the link again starts over (a failed deck is retryable)
+    if (why) await step("record why", () => sql()`update import_sources set status = 'failed', error = ${why} where id = ${sourceId}`);
+  };
+  return { sourceId, read };
 }
 
 /* ---- a sale written in the email itself ---- */
@@ -662,12 +675,30 @@ export interface RunResult {
 /* First run: the last 30 days. After that: from the last successful run.
    `days` rescans further back (decks already read are skipped, not re-read). */
 export async function runListservImport(opts: { days?: number } = {}): Promise<RunResult> {
-  const get = engine(); // fail fast, before recording a run, if not configured
+  return finishListservRun(await startListservRun(opts));
+}
+
+/* a run with no finish this old was cut off (the server restarted mid-run) */
+export const STALE_RUN_MS = 30 * 60_000;
+
+/* The quick half of a run: check InboxEngine is set up, refuse to overlap a run
+   still going, and record this one. finishListservRun is the slow half (many
+   decks, minutes each), which a page runs after answering. */
+export async function startListservRun(opts: { days?: number } = {}): Promise<{ id: string; since: string }> {
+  engine(); // fail fast, before recording a run, if not configured
+  const [going] = await step("load running", () => sql()<Row[]>`
+    select started_at from import_runs where finished_at is null and started_at > now() - make_interval(secs => ${STALE_RUN_MS / 1000}) limit 1`);
+  if (going) throw new Error("A listserv search is already running. Its result shows here when it's done.");
   const [last] = await step("load last run", () => sql()<Row[]>`select started_at from import_runs where ok = true order by started_at desc limit 1`);
   const days = opts.days ?? (last ? null : FIRST_RUN_DAYS);
   const since = days ? new Date(Date.now() - days * 86_400_000).toISOString() : (last!.started_at as string);
   const [run] = await step("record run", () => sql()<Row[]>`insert into import_runs (since) values (${since}) returning id`);
+  return { id: run.id as string, since };
+}
 
+export async function finishListservRun(run: { id: string; since: string }): Promise<RunResult> {
+  const get = engine();
+  const { since } = run;
   try {
     const summaries: EngineSummary[] = [];
     for (let offset = 0; offset < 1000; offset += 100) {
@@ -738,10 +769,10 @@ export async function runListservImport(opts: { days?: number } = {}): Promise<R
     const failedNow = [...decks, ...emailSales].filter((d) => d.status === "failed").length;
     const read = emailSales.filter((e) => e.status !== "skipped" || e.detail !== "already read").length;
     const summary = `${summaries.length} emails, ${decks.length} decks, ${read} email sales, ${created} items for review, ${failedNow} failed`;
-    await step("finish run", () => sql()`update import_runs set finished_at = now(), ok = true, summary = ${summary} where id = ${run.id as string}`);
+    await step("finish run", () => sql()`update import_runs set finished_at = now(), ok = true, summary = ${summary} where id = ${run.id}`);
     return { since, emails: summaries.length, decks, emailSales };
   } catch (e) {
-    await sql()`update import_runs set finished_at = now(), ok = false, summary = ${e instanceof Error ? e.message : String(e)} where id = ${run.id as string}`;
+    await sql()`update import_runs set finished_at = now(), ok = false, summary = ${e instanceof Error ? e.message : String(e)} where id = ${run.id}`;
     throw e;
   }
 }

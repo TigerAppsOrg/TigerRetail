@@ -3,12 +3,13 @@
    a Server Action is a public POST endpoint, so the page that rendered the
    button proves nothing about who is calling it. */
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { safeNext } from "@/lib/cas";
 import { getViewer, requireUser } from "@/lib/auth";
 import * as data from "@/lib/data";
 import { claim, isAdmin, publishOwn, takeDown } from "@/lib/importer/admin";
-import { importOwnDeck, isResidentialBuilding } from "@/lib/importer/importer";
+import { isResidentialBuilding, startOwnDeck } from "@/lib/importer/importer";
 import { deckIdsIn, linksIn } from "@/lib/importer/rules";
 import { isBlankItem, parseContact, parseDollars, parseItem, parseProfile, type ContactChoice, type ItemDraft, type ItemInput } from "@/lib/rules";
 import type { CardListing } from "./_components/ListingCard";
@@ -213,8 +214,11 @@ export async function importOwnDeckAction(_: DeckState, f: FormData): Promise<De
   const text = String(f.get("url") ?? "").trim();
   const [deckId] = deckIdsIn([text, ...linksIn(text)]);
   if (!deckId) return { error: "That isn't a Google Slides link. It looks like docs.google.com/presentation/d/…" };
-  const r = await importOwnDeck(deckId, user);
+  const r = await startOwnDeck(deckId, user);
   if ("error" in r) return { error: r.error };
+  // reading takes minutes, longer than Cloudflare keeps a request open: the sale
+  // page says "reading" and refreshes itself until it's done
+  if (r.read) after(r.read);
   revalidatePath("/", "layout");
   redirect(`/welcome/${r.sourceId}`);
 }

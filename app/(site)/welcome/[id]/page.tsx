@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { requireUser } from "@/lib/auth";
 import { canManage, isAdmin, saleListings, sourceFor } from "@/lib/importer/admin";
+import { olderThan, STALE_PENDING_MS } from "@/lib/importer/importer";
 import { formatCents } from "@/lib/rules";
 import { claimImportAction, publishOwnAction, takeDownImportAction } from "../../actions";
+import { AutoRefresh } from "../../_components/AutoRefresh";
 import { BuildingSelect } from "../../_components/ProfileForm";
 
 /* A seller's sale page. Two ways in:
@@ -42,6 +44,30 @@ async function Welcome({ params }: { params: PageProps<"/welcome/[id]">["params"
     return (
       <div className="empty" style={{ maxWidth: 560 }}>
         this sale was posted by someone else. if it&rsquo;s yours, sign in with the netid you sent it from.
+      </div>
+    );
+  }
+  // a pasted deck is read in the background: say so until it's done, or say why it failed
+  if (own && source.status !== "done") {
+    const cutOff = source.status === "pending" && olderThan(source.createdAt, STALE_PENDING_MS);
+    return source.status === "pending" && !cutOff ? (
+      <div className="acct" style={{ maxWidth: 640 }}>
+        <AutoRefresh />
+        <h1 className="sec-title">reading your slides…</h1>
+        <p className="sub" role="status" style={{ marginTop: 6 }}>
+          claude is turning each item into a draft: photos, prices, sizes. a big deck takes a few minutes. this page updates by itself, and you can
+          leave and come back.
+        </p>
+      </div>
+    ) : (
+      <div className="acct" style={{ maxWidth: 640 }}>
+        <h1 className="sec-title">couldn&rsquo;t read your slides</h1>
+        <p className="err" role="alert">
+          {cutOff ? "The read was cut off before it finished. Paste the link again." : source.error}
+        </p>
+        <Link className="btn btn-primary" href="/sell" style={{ alignSelf: "flex-start" }}>
+          back to the sell page
+        </Link>
       </div>
     );
   }
