@@ -1,9 +1,13 @@
 import { connection } from "next/server";
 import { sql } from "@/lib/db";
+import { env } from "@/lib/env";
 
 export async function GET() {
   await connection();
   try {
+    env.appUrl();
+    env.sessionSecret();
+    env.r2();
     await sql()`select 1`;
     return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
   } catch {
