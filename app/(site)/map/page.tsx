@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { mapMarketplace } from "@/lib/data";
 import { LiveMap } from "./LiveMap";
@@ -14,6 +15,7 @@ export default function MapPage() {
 }
 
 async function MapData() {
+  await connection(); // Load live listings at request time, not during CI builds.
   const { sellers, listings } = await mapMarketplace();
   return <LiveMap sellers={sellers} listings={listings} />;
 }
