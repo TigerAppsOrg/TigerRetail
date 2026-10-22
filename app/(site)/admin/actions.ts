@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { approve, isAdmin, reject, sendInvite } from "@/lib/importer/admin";
+import { approveSaleAndInvite, approve, isAdmin, reject, sendInvite } from "@/lib/importer/admin";
 import { finishListservRun, readDeck, startDeck, startListservRun } from "@/lib/importer/importer";
 import { dismissSource, retrySource } from "@/lib/importer/queue";
 import { deckIdsIn } from "@/lib/importer/rules";
@@ -68,6 +68,13 @@ export async function inviteAction(_: ImportState, f: FormData): Promise<ImportS
 
 export async function reviewAction(f: FormData) {
   await requireAdmin();
+  if (f.get("decision") === "approve" && f.get("sourceId")) {
+    let notice: string;
+    try { notice = await approveSaleAndInvite(String(f.get("sourceId"))); }
+    catch (e) { notice = `Approval failed: ${e instanceof Error ? e.message : String(e)}`; }
+    revalidatePath("/", "layout");
+    redirect(`/admin/imports?notice=${encodeURIComponent(notice)}`);
+  }
   const ids = f.getAll("id").map(String);
   if (f.get("decision") === "approve") await approve(ids);
   else await reject(ids);
