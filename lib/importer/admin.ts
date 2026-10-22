@@ -138,29 +138,43 @@ async function deleteListings(rows: Row[]) {
 
 /* Email the person who posted the sale an invite to join and manage it. In
    test mode (the default) it goes to INVITE_TEST_RECIPIENT, not them. */
-export async function sendInvite(sourceId: string): Promise<{ to: string; test: boolean }> {
-  const source = await sourceFor(sourceId);
-  if (!source) throw new Error("No such sale.");
-  if (!netidFromEmail(source.authorEmail)) throw new Error("This sale has no princeton.edu address to invite.");
-  const items = await step("count sale items", () => sql()<Row[]>`select id from listings where import_source_id = ${sourceId} and seller_netid = ${IMPORT_ACCOUNT}`);
-  if (!items.length) throw new Error("Nothing from this sale is left to manage.");
-  // a double click (SendGrid has no "send once" key): one invite a minute per sale
-  if (source.invitedAt && Date.now() - new Date(source.invitedAt).getTime() < 60_000) {
-    throw new Error("An invite for this sale went out less than a minute ago.");
-  }
-  const { to, test } = inviteRecipient(source.authorEmail!, process.env);
-  const mail = inviteEmail({
-    name: source.authorName,
-    sale: source.subject ?? "your sale",
-    count: items.length,
-    url: `${env.appUrl()}/welcome/${source.id}`,
-    intended: source.authorEmail!,
-    test,
+export async function sendInvite(sourceId: string, options: { once?: boolean } = {}): Promise<{ to: string; test: boolean; alreadySent?: boolean }> {
+  if (!UUID.test(sourceId)) throw new Error("No such sale.");
+  // Serialize manual and automatic sends for this sale, including across servers.
+  return sql().begin(async (tx) => {
+    const [row] = await tx<Row[]>`select * from import_sources where id = ${sourceId} for update`;
+    if (!row) throw new Error("No such sale.");
+    const source = toSource(row);
+    if (!netidFromEmail(source.authorEmail)) throw new Error("This sale has no princeton.edu address to invite.");
+    const { to, test } = inviteRecipient(source.authorEmail!, process.env);
+    if (options.once && source.invitedAt && source.invitedTo === to) return { to, test, alreadySent: true };
+    const items = await tx<Row[]>`select id from listings where import_source_id = ${sourceId} and seller_netid = ${IMPORT_ACCOUNT} and status = 'active'`;
+    if (!items.length) throw new Error("There are no approved, unclaimed items from this sale to invite the seller to manage.");
+    if (source.invitedAt && Date.now() - new Date(source.invitedAt).getTime() < 60_000) {
+      throw new Error("An invite for this sale went out less than a minute ago.");
+    }
+    const mail = inviteEmail({ name: source.authorName, sale: source.subject ?? "your sale", count: items.length,
+      url: `${env.appUrl()}/welcome/${source.id}`, intended: source.authorEmail!, test });
+    await sendMail({ to, ...mail, idempotencyKey: `invite/${source.id}/${Math.floor(Date.now() / 60_000)}` });
+    await tx`update import_sources set invited_at = now(), invited_to = ${to} where id = ${source.id}`;
+    return { to, test };
   });
-  // a double click within the minute sends once
-  await sendMail({ to, ...mail, idempotencyKey: `invite/${source.id}/${Math.floor(Date.now() / 60_000)}` });
-  await step("record invite", () => sql()`update import_sources set invited_at = now(), invited_to = ${to} where id = ${source.id}`);
-  return { to, test };
+}
+
+export async function approveSaleAndInvite(sourceId: string): Promise<string> {
+  if (!UUID.test(sourceId)) throw new Error("Invalid sale.");
+  const [eligible] = await sql()`select id from import_sources where id = ${sourceId} and submitted_by is null and status = 'done'`;
+  if (!eligible) throw new Error("This sale is not ready for admin approval.");
+  await step("approve sale", () => sql()`update listings set status = 'active'
+    where import_source_id = ${sourceId} and status = 'review'
+      and exists (select 1 from import_sources where id = ${sourceId} and submitted_by is null and status = 'done')`);
+  try {
+    const result = await sendInvite(sourceId, { once: true });
+    if (result.alreadySent) return "Items approved. An invite was already sent; no duplicate email was sent.";
+    return result.test ? `Items approved. Test invite sent to ${result.to} (not the seller).` : `Items approved. Invite sent to ${result.to}.`;
+  } catch (e) {
+    return `Items approved, but the invite was not sent: ${e instanceof Error ? e.message : String(e)}. Use send invite to retry.`;
+  }
 }
 
 /* ---- on the listing page ---- */

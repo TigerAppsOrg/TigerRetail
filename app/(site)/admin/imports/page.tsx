@@ -8,17 +8,19 @@ import { netidFromEmail } from "@/lib/importer/rules";
 import { formatCents } from "@/lib/rules";
 import { AutoRefresh } from "../../_components/AutoRefresh";
 import { reviewAction } from "../actions";
-import { ImportForms, InviteButton, SourceButton } from "./ImportForms";
+import { ImportForms, InviteButton, SourceButton, ApproveAllButton } from "./ImportForms";
 
 /* Listserv imports: run them, approve or reject each item before anyone sees
    it (the admin's approval is the consent to republish), and invite each
    sale's poster to claim it. */
-export default function ImportsPage() {
+type ImportSearch = Promise<{ notice?: string | string[] }>;
+
+export default function ImportsPage({ searchParams }: { searchParams: ImportSearch }) {
   return (
     <div className="wf">
       <div className="wrap" style={{ paddingTop: 24 }}>
         <Suspense fallback={<p className="sub">loading…</p>}>
-          <Imports />
+          <Imports searchParams={searchParams} />
         </Suspense>
         <div style={{ height: 70 }} />
       </div>
@@ -26,7 +28,9 @@ export default function ImportsPage() {
   );
 }
 
-async function Imports() {
+async function Imports({ searchParams }: { searchParams: ImportSearch }) {
+  const params = await searchParams;
+  const notice = typeof params.notice === "string" ? params.notice : null;
   const user = await requireUser("/admin/imports");
   if (!isAdmin(user.netid)) notFound();
   const [queue, runs] = await Promise.all([reviewQueue(), recentRuns()]);
@@ -40,6 +44,7 @@ async function Imports() {
     <>
       {(runGoing || reading) && <AutoRefresh />}
       <h1 className="sec-title">listserv imports</h1>
+      {notice && <p className="note" role="status">{notice}</p>}
       <p className="sub" style={{ marginTop: 4 }}>
         items from sale decks, and from sales written in an email with photos, wait here until you approve them. approving one publishes it with the
         contact details from the seller&rsquo;s own post (only signed-in users see those). send the seller an invite to claim their sale; while
@@ -97,12 +102,11 @@ async function Imports() {
             {/* everything from this seller's sale in one click, without scrolling past it */}
             {items.length > 1 && (
               <form action={reviewAction}>
+                <input type="hidden" name="sourceId" value={source.id} />
                 {items.map((it) => (
                   <input key={it.id} type="hidden" name="id" value={it.id} />
                 ))}
-                <button className="btn btn-primary" name="decision" value="approve" style={{ padding: "6px 14px" }}>
-                  approve all {items.length} from {source.authorName ?? "this sale"}
-                </button>
+                <ApproveAllButton>approve all {items.length} from {source.authorName ?? "this sale"}</ApproveAllButton>
               </form>
             )}
             {source.status === "done" && netidFromEmail(source.authorEmail) && (
@@ -154,12 +158,11 @@ async function Imports() {
                 ))}
               </div>
               <form action={reviewAction} style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                <input type="hidden" name="sourceId" value={source.id} />
                 {items.map((it) => (
                   <input key={it.id} type="hidden" name="id" value={it.id} />
                 ))}
-                <button className="btn btn-outline" name="decision" value="approve">
-                  approve all {items.length}
-                </button>
+                <ApproveAllButton outline>approve all {items.length}</ApproveAllButton>
                 <button className="btn btn-ghost" name="decision" value="reject">
                   reject all
                 </button>

@@ -1,5 +1,6 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, type ReactNode } from "react";
+import { useFormStatus } from "react-dom";
 import { importLinkAction, inviteAction, sourceAction, runNowAction, type ImportState } from "../actions";
 
 export function ImportForms({ engineConfigured }: { engineConfigured: boolean }) {
@@ -80,4 +81,11 @@ export function SourceButton({ sourceId, decision, disabled = false }: { sourceI
       {state?.error && <span role="alert" className="err">{state.error}</span>}
     </form>
   );
+}
+
+export function ApproveAllButton({ children, outline = false }: { children: ReactNode; outline?: boolean }) {
+  const { pending } = useFormStatus();
+  return <button className={`btn ${outline ? "btn-outline" : "btn-primary"}`} name="decision" value="approve" disabled={pending}>
+    {pending ? "approving & sending…" : children}
+  </button>;
 }
