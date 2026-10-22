@@ -1,4 +1,4 @@
-/* Icons copied from the wireframe (wireframe/index.html, const I). Static,
+/* Marketplace icons. Static,
    trusted SVG strings, so they render through innerHTML unchanged. */
 const SVG = {
   search: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',

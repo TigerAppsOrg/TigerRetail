@@ -1,22 +1,21 @@
-/* Fill the dev database with the wireframe's own demo marketplace, so the app
+/* Fill the dev database with a fixture marketplace, so the app
    can be seen with data in it. Dev only: it writes with the database and S3
    settings in .env.local and never runs in the app.
 
-     npm run seed -- --owner <netid>   seed (the wireframe's "my listings" go to <netid>)
+     npm run seed -- --owner <netid>   seed (fixture listings owned by "me" go to <netid>)
      npm run seed:clear                remove everything this script added
 
-   Where the data comes from: wireframe/index.html is loaded in headless
-   Chrome and its seedListings() state is read back, so titles, brands, sizes,
-   conditions, descriptions and offers are exactly the wireframe's. Each
-   item's illustration (artSvg) is rendered to a PNG and uploaded as its photo.
+   Data and illustrations live in fixtures/seed/. Each item's illustration
+   is rendered to a PNG and uploaded as its photo.
 
    Everything seeded is findable again: photos live under listing-photos/seed/,
-   and every seeded person's netid starts with "seed-" (so a wireframe netid
+   and every seeded person's netid starts with "seed-" (so a fixture netid
    like hm3390 can never collide with a real student's). Listings given to
    --owner are found by their seed/ photo path. Drafts (no draft support yet)
    are skipped; "on hold" items are seeded as active. */
 import { chromium } from "playwright-core";
 import { readFileSync } from "node:fs";
+import { artSvg } from "../fixtures/seed/art.mjs";
 import { db, insert, putPhoto, removePhotos } from "../e2e/testdb.mjs";
 
 const BUCKET = "listing-photos";
@@ -43,7 +42,7 @@ if (clearOnly) {
   process.exit(0);
 }
 if (!owner) {
-  console.error("Usage: npm run seed -- --owner <your netid>   (the wireframe's own listings go to that account)");
+  console.error("Usage: npm run seed -- --owner <your netid>   (fixture listings owned by me go to that account)");
   process.exit(1);
 }
 const ownerRow = await db`select netid, phone, payments, building from users where netid = ${owner}`;
@@ -51,20 +50,14 @@ if (!ownerRow.length) throw new Error(`No user ${owner}. Sign in once through CA
 
 await clear(); // re-seeding replaces, never duplicates
 
-// ---- 1. read the wireframe's demo marketplace ----
-let html = readFileSync("wireframe/index.html", "utf8");
-const end = html.lastIndexOf("})();");
-html = html.slice(0, end) + "window.__wf = { get S() { return S; }, artSvg, sizeFacet };\n" + html.slice(end);
+// ---- 1. read the development seed fixtures ----
+const listings = JSON.parse(readFileSync(new URL("../fixtures/seed/listings.json", import.meta.url), "utf8"));
 const browser = await chromium.launch({ channel: "chrome" });
 const page = await browser.newPage({ viewport: { width: 480, height: 600 }, deviceScaleFactor: 1 });
-await page.setContent(html, { waitUntil: "load" });
-const listings = await page.evaluate(() =>
-  window.__wf.S.listings.map((l) => ({ ...l, sizeFacet: window.__wf.sizeFacet(l) })),
-);
 
 /* render one illustration as a 480×600 PNG */
 async function art(artName, pal) {
-  const svg = await page.evaluate(([a, p]) => window.__wf.artSvg(a, p), [artName, pal]);
+  const svg = artSvg(artName, pal);
   await page.setContent(`<body style="margin:0">${svg.replace('class="art"', 'width="480" height="600"')}</body>`);
   return page.locator("svg").screenshot({ type: "png" });
 }

@@ -54,3 +54,20 @@ See [AWS hosting](deploy/README.md) for SSH, secrets, release management, and
 shared database migration details.
 
 Princeton CAS requires the custom `*.tigerapps.org` hostname for sign-in.
+
+## Where to work
+
+`main` is the shared source of truth and the branch deployed to AWS. Start new
+work from an up-to-date `main` and merge changes through a pull request.
+
+- `app/(site)/`: the live marketplace pages, actions, and shared UI styles.
+- `components/campus-map/`: the live map and its filtering/rendering logic.
+- `lib/`: authentication, database access, storage, messaging, and imports.
+- `db/migrations/`: database history; keep applied migrations intact.
+- `deploy/` and `.github/workflows/`: AWS release configuration.
+- `fixtures/seed/`: development seed data and illustrations, used by `bun run seed`.
+- `app/dev/map-demo/` and `fixtures/demoMarketplace.ts`: the development-only
+  map stress test, exercised by `bun run e2e:map`. It returns 404 in production.
+
+The standalone HTML prototype has been retired. Update the Next.js app directly;
+its shared marketplace styles live in `app/(site)/marketplace.css`.

@@ -2,10 +2,10 @@ import { Suspense } from "react";
 import { getViewer } from "@/lib/auth";
 import { unreadCount } from "@/lib/data";
 import { Nav } from "./_components/Nav";
-import "./wireframe.css";
+import "./marketplace.css";
 import "./site.css";
 
-/* `.wf` scopes the wireframe's element styles (see wireframe.css). The nav
+/* `.wf` scopes the marketplace element styles (see marketplace.css). The nav
    and every page wear it; the map page doesn't, so the ArcGIS widgets keep
    their own look. */
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
