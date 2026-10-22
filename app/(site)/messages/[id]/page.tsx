@@ -39,9 +39,9 @@ async function Conversation({ params }: { params: PageProps<"/messages/[id]">["p
             <Avatar person={other} size={34} />
             <b>{personLabel(other)}</b>
           </PersonLink>
-          <span className="muted">{iAmSeller ? "· buyer" : "· seller"}</span>
+          {listing && <span className="muted">{iAmSeller ? "· buyer" : "· seller"}</span>}
         </span>
-        <Link className="convo-item" href={`/listings/${listing.id}`}>
+        {listing && <Link className="convo-item" href={`/listings/${listing.id}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={listing.photoUrl} alt="" />
           <span>
@@ -51,7 +51,7 @@ async function Conversation({ params }: { params: PageProps<"/messages/[id]">["p
               {listing.status === "sold" ? " · sold" : ""}
             </span>
           </span>
-        </Link>
+        </Link>}
       </div>
       <Thread conversationId={conversation.id} me={user.netid} other={other} initial={messages} />
     </div>

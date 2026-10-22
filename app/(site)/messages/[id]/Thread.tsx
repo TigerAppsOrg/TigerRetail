@@ -78,7 +78,7 @@ export function Thread({ conversationId, me, other, initial }: { conversationId:
       <div className="thread" aria-live="polite">
         {messages.length === 0 && (
           <p className="sub" style={{ textAlign: "center", margin: "30px auto" }}>
-            say hi to {other.displayName || other.netid} &mdash; ask if it&rsquo;s still available, how it fits, or when to pick up.
+            say hi to {other.displayName || other.netid} &mdash; write your first message below.
           </p>
         )}
         {messages.map((m, i) => {

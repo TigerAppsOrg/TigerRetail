@@ -12,9 +12,9 @@ export default function MessagesPage() {
   return (
     <div className="wf">
       <div className="wrap" style={{ paddingTop: 24 }}>
-        <h1 className="sec-title">messages</h1>
+        <div className="sec-head"><h1 className="sec-title">messages</h1><Link className="btn btn-primary" href="/messages/new">+ new message</Link></div>
         <p className="sub" style={{ marginTop: 4 }}>
-          questions and pickup plans, one conversation per item.
+          message someone directly, or keep talking about an item.
         </p>
         <Suspense fallback={<p className="sub">loading…</p>}>
           <Inbox />
@@ -33,7 +33,7 @@ async function Inbox() {
   if (!rows.length) {
     return (
       <div className="empty" style={{ marginTop: 18 }}>
-        no messages yet. open any listing and tap <b>message seller</b> to ask a question.
+        no messages yet. choose <Link href="/messages/new">new message</Link> to start a conversation.
       </div>
     );
   }
@@ -45,7 +45,7 @@ async function Inbox() {
           <div className="inbox-mid">
             <div className="inbox-top">
               <b>{personLabel(r.other)}</b>
-              <span className="muted">· {r.listing.title}</span>
+              {r.listing && <span className="muted">· {r.listing.title}</span>}
             </div>
             <div className="inbox-last">
               {r.lastFromMe ? "you: " : ""}
@@ -56,10 +56,10 @@ async function Inbox() {
             {r.lastMessageAt && <span className="muted">{ago(r.lastMessageAt, now)}</span>}
             {r.unread && <span className="dot" aria-label="unread" />}
           </div>
-          <span className="inbox-thumb">
+          {r.listing && <span className="inbox-thumb">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={r.listing.photoUrl} alt="" />
-          </span>
+          </span>}
         </Link>
       ))}
     </div>

@@ -558,17 +558,17 @@ export interface Message {
 }
 export interface Conversation extends ConversationState {
   id: string;
-  listingId: string;
+  listingId: string | null;
 }
 export interface ConversationView {
   conversation: Conversation;
-  listing: { id: string; title: string; priceCents: number; photoUrl: string; status: ListingStatus };
+  listing: { id: string; title: string; priceCents: number; photoUrl: string; status: ListingStatus } | null;
   other: Person;
   messages: Message[];
 }
 export interface InboxRow {
   id: string;
-  listing: { id: string; title: string; photoUrl: string };
+  listing: { id: string; title: string; photoUrl: string } | null;
   other: Person;
   lastMessage: string | null;
   lastMessageAt: string | null;
@@ -578,7 +578,7 @@ export interface InboxRow {
 
 const toConversation = (r: Row): Conversation => ({
   id: r.id as string,
-  listingId: r.listing_id as string,
+  listingId: r.listing_id as string | null,
   buyerNetid: r.buyer_netid as string,
   sellerNetid: r.seller_netid as string,
   lastMessageAt: r.last_message_at as string | null,
@@ -634,15 +634,15 @@ export async function conversationFor(id: string, viewer: string): Promise<Conve
   }
   const otherNetid = c.buyerNetid === viewer ? c.sellerNetid : c.buyerNetid;
   const [listing, who, rows] = await Promise.all([
-    getListing(c.listingId),
+    c.listingId ? getListing(c.listingId) : Promise.resolve(null),
     people([otherNetid]),
     step("load messages", () => sql()<Row[]>`select * from messages where conversation_id = ${c.id} order by created_at`),
   ]);
-  if (!listing) return null;
+  if (c.listingId && !listing) return null;
   await markRead(c, viewer);
   return {
     conversation: c,
-    listing: { id: listing.id, title: listing.title, priceCents: listing.priceCents, photoUrl: listing.photoUrls[0], status: listing.status },
+    listing: listing ? { id: listing.id, title: listing.title, priceCents: listing.priceCents, photoUrl: listing.photoUrls[0], status: listing.status } : null,
     other: who.get(otherNetid) ?? { netid: otherNetid, displayName: null, avatarUrl: null },
     messages: rows.map(toMessage),
   };
@@ -676,7 +676,7 @@ export async function messagesSince(conversationId: string, viewer: string, afte
 export async function inbox(viewer: string): Promise<InboxRow[]> {
   const rows = await step("load inbox", () => sql()<Row[]>`
     select c.*, l.title as listing_title, l.photo_paths as listing_photo_paths
-    from conversations c join listings l on l.id = c.listing_id
+    from conversations c left join listings l on l.id = c.listing_id
     where (c.buyer_netid = ${viewer} or c.seller_netid = ${viewer}) and c.last_message_at is not null
     order by c.last_message_at desc`);
   const convs = rows.map((r) => ({ c: toConversation(r), l: r }));
@@ -693,7 +693,7 @@ export async function inbox(viewer: string): Promise<InboxRow[]> {
   const lastBody = new Map(lasts.map((r) => [r.conversation_id as string, r.body as string]));
   return convs.map(({ c, l }, i) => ({
     id: c.id,
-    listing: { id: c.listingId, title: l.listing_title as string, photoUrl: photoUrl((l.listing_photo_paths as string[])[0]) },
+    listing: c.listingId ? { id: c.listingId, title: l.listing_title as string, photoUrl: photoUrl((l.listing_photo_paths as string[])[0]) } : null,
     other: who.get(others[i]) ?? { netid: others[i], displayName: null, avatarUrl: null },
     lastMessage: lastBody.get(c.id) ?? null,
     lastMessageAt: c.lastMessageAt,
