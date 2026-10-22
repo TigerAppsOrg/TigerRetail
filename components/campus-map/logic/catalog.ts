@@ -1,6 +1,6 @@
 import type { Dept, Recency, Section } from "../types";
 
-/* Same sections and order as the TigerRetail wireframe (wireframe/index.html),
+/* Sections and order shared with the TigerRetail marketplace,
    which is the source of truth for the catalog. */
 export const SECTIONS: [Section, string[]][] = [
   ["clothing", ["tops", "bottoms", "dresses/rompers", "outerwear", "shoes", "bags & accessories"]],

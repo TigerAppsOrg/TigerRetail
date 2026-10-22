@@ -1,4 +1,4 @@
-/* The wireframe's catalog and browse rules (wireframe/index.html), as pure
+/* Marketplace catalog and browse rules, as pure
    functions. Sections live in the map's catalog so both share one list. */
 import type { Section } from "@/components/campus-map/types";
 import { APPAREL, SECTIONS } from "@/components/campus-map/logic/catalog";

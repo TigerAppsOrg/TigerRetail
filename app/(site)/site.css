@@ -1,7 +1,7 @@
-/* App-only additions on top of wireframe.css: things the wireframe didn't
+/* App-only additions on top of marketplace.css: things the wireframe didn't
    need because it was one static page. */
 
-/* the nav sticks as a whole (wireframe.css makes .nav sticky inside its own box) */
+/* the nav sticks as a whole (marketplace.css makes .nav sticky inside its own box) */
 .nav-holder{position:sticky;top:0;z-index:40}
 .site-shell{min-height:100dvh;display:flex;flex-direction:column}
 

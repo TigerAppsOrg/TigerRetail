@@ -1,9 +1,6 @@
-/* Ported verbatim from wireframe/index.html (the design source of truth), so
-   class names match the wireframe one-to-one. Changes from the original:
-   - element rules (button, select, h1…) are scoped to :where(.wf), so they
-     can't leak into the campus map, which styles itself with CSS modules
-   - fonts come from next/font variables
-   - light theme only; the demo's corner switch and toast are gone */
+/* Shared marketplace styles. Element rules are scoped to :where(.wf) so
+   they cannot leak into the campus map, which uses CSS modules.
+   Fonts come from next/font variables; the marketplace uses a light theme. */
 :root{
   --paper:#FFFCF3;
   --surface:#FFFFFF;
