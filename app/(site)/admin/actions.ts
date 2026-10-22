@@ -7,6 +7,7 @@ import { after } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { approve, isAdmin, reject, sendInvite } from "@/lib/importer/admin";
 import { finishListservRun, readDeck, startDeck, startListservRun } from "@/lib/importer/importer";
+import { dismissSource, retrySource } from "@/lib/importer/queue";
 import { deckIdsIn } from "@/lib/importer/rules";
 
 async function requireAdmin() {
@@ -73,4 +74,20 @@ export async function reviewAction(f: FormData) {
   revalidatePath("/", "layout");
   // from a listing's preview page: back to the queue
   if (f.get("back") === "queue") redirect("/admin/imports");
+}
+
+export async function sourceAction(_: ImportState, f: FormData): Promise<ImportState> {
+  await requireAdmin();
+  const id = String(f.get("sourceId") ?? "");
+  const decision = f.get("decision");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return { error: "Invalid import." };
+  if (decision !== "done" && decision !== "retry") return { error: "Invalid action." };
+  try {
+    if (decision === "done") await dismissSource(id);
+    else after(await retrySource(id));
+    revalidatePath("/admin/imports");
+    return { message: decision === "done" ? "Cleared from the queue. Listings are unchanged." : "Retry started. This page will update when it finishes." };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
 }

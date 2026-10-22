@@ -104,7 +104,7 @@ for (const [i, l] of listings.entries()) {
   }
   const [row] = await insert("listings", {
     seller_netid: seller,
-    title: l.title,
+    title: `[seed] ${l.title}`,
     description: l.desc ?? "",
     price_cents: Math.round(l.price * 100),
     section: l.cat,
