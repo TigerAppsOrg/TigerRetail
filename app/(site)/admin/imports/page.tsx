@@ -8,7 +8,7 @@ import { netidFromEmail } from "@/lib/importer/rules";
 import { formatCents } from "@/lib/rules";
 import { AutoRefresh } from "../../_components/AutoRefresh";
 import { reviewAction } from "../actions";
-import { ImportForms, InviteButton } from "./ImportForms";
+import { ImportForms, InviteButton, SourceButton } from "./ImportForms";
 
 /* Listserv imports: run them, approve or reject each item before anyone sees
    it (the admin's approval is the consent to republish), and invite each
@@ -55,11 +55,15 @@ async function Imports() {
           {String(lastRun.summary ?? (lastRun.finished_at ? "" : runGoing ? "still running…" : "cut off before it finished (the server restarted); run it again"))}
         </p>
       )}
-      <h2 className="sec-title" style={{ fontSize: 20, margin: "18px 0 10px" }}>
-        waiting for review ({waiting})
-      </h2>
-      {queue.length === 0 && <div className="empty">nothing imported yet.</div>}
-      {queue.map(({ source, items }) => (
+      {[
+        { title: "pending", entries: queue.filter(({ source, items }) => source.status !== "done" || items.length > 0) },
+        { title: "reviewed", entries: queue.filter(({ source, items }) => source.status === "done" && items.length === 0) },
+      ].map(({ title, entries }) => (
+        <section key={title} aria-label={title}>
+          <h2 className="sec-title" style={{ fontSize: 20, margin: "18px 0 10px" }}>{title} ({entries.length})</h2>
+          {title === "pending" && <p className="sub">{waiting} items waiting for approval</p>}
+          {entries.length === 0 && <p className="sub">{title === "pending" ? "nothing pending." : "nothing reviewed yet."}</p>}
+          {entries.map(({ source, items }) => (
         <div key={source.id} className="sect review-deck">
           <div className="sec-head">
             <div>
@@ -77,9 +81,16 @@ async function Imports() {
                 )}
               </span>
             </div>
-            <span className={`ostat ${source.status === "done" ? "accepted" : ""}`}>
-              {source.status === "pending" ? (!olderThan(source.createdAt, STALE_PENDING_MS) ? "reading…" : "cut off") : source.status}
-            </span>
+            {source.status === "done" ? (
+              <SourceButton sourceId={source.id} decision="done" disabled={items.length > 0} />
+            ) : source.status === "failed" ? (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span className="err">failed</span>
+                <SourceButton sourceId={source.id} decision="retry" />
+              </div>
+            ) : (
+              <span className="ostat">{!olderThan(source.createdAt, STALE_PENDING_MS) ? "reading…" : "cut off"}</span>
+            )}
           </div>
           {source.error && <p className={source.status === "failed" ? "err" : "sub"}>{source.status === "failed" ? source.error : `skipped: ${source.error}`}</p>}
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 6 }}>
@@ -156,6 +167,8 @@ async function Imports() {
             </>
           )}
         </div>
+          ))}
+        </section>
       ))}
     </>
   );

@@ -214,7 +214,17 @@ export async function startDeck(deckId: string, email: EmailMeta, owner?: User):
     }
     return { skipped: { deckId, status: "skipped", detail: "already imported", created: 0 } };
   }
-  if (existing) await step("clear failed attempt", () => sql()`delete from import_sources where id = ${existing.id as string}`);
+  if (existing) {
+    const [claimed] = await sql()<Row[]>`update import_sources set status = 'pending', error = null, created_at = now(),
+      message_id = ${email.messageId}, subject = ${email.subject}, listserv = ${email.listserv},
+      author_name = ${email.authorName}, author_email = ${email.authorEmail?.toLowerCase() ?? null},
+      sent_at = ${email.sentAt}, submitted_by = ${owner?.netid ?? null}
+      where id = ${existing.id as string}
+        and (status = 'failed' or (status = 'pending' and created_at < now() - interval '15 minutes'))
+        and not exists (select 1 from listings where import_source_id = ${existing.id as string})
+      returning id`;
+    return claimed ? { sourceId: claimed.id as string } : { skipped: { deckId, status: "skipped", detail: "already reading or has imported items", created: 0 } };
+  }
 
   const record = {
     deck_id: deckId,
@@ -366,10 +376,17 @@ async function fetchPhoto(url: string): Promise<Buffer | null> {
 /* An email selling items in its body, with photos attached. Read once:
    emails that turn out not to be sales are recorded too, so they're never
    paid for twice. */
-export async function importEmailSale(m: EngineMessage, photoUrls: string[]): Promise<EmailSaleResult> {
-  const [existing] = await step("find email", () => sql()<Row[]>`select id, status from import_sources where kind = 'email' and message_id = ${m.id}`);
+export async function importEmailSale(m: EngineMessage, photoUrls: string[], claimedSourceId?: string): Promise<EmailSaleResult> {
+  const [existing] = claimedSourceId ? [] : await step("find email", () => sql()<Row[]>`select id, status from import_sources where kind = 'email' and message_id = ${m.id}`);
   if (existing && existing.status !== "failed") return { messageId: m.id, status: "skipped", detail: "already read", created: 0 };
-  if (existing) await step("clear failed attempt", () => sql()`delete from import_sources where id = ${existing.id as string}`);
+  if (existing) {
+    const [claimed] = await sql()<Row[]>`update import_sources set status = 'pending', error = null, created_at = now()
+      where id = ${existing.id as string} and status = 'failed'
+        and not exists (select 1 from listings where import_source_id = ${existing.id as string})
+      returning id`;
+    if (!claimed) return { messageId: m.id, status: "skipped", detail: "already reading or has imported items", created: 0 };
+    claimedSourceId = claimed.id as string;
+  }
 
   const author = saleAuthor(m.sender, m.senderEmail);
   const record = {
@@ -382,7 +399,7 @@ export async function importEmailSale(m: EngineMessage, photoUrls: string[]): Pr
     author_email: author.email,
     sent_at: m.sentAt,
   };
-  const [source] = await step("record email", () => sql()<Row[]>`insert into import_sources ${sql()(record)} returning id`);
+  const [source] = claimedSourceId ? [{ id: claimedSourceId }] : await step("record email", () => sql()<Row[]>`insert into import_sources ${sql()(record)} returning id`);
   const finish = async (found: number, why: string | null, contact?: SaleContact, notes: string[] = []) => {
     const patch = { status: "done", slides: null, items_found: found, error: why, ...(contact ? await contactColumns(contact, notes) : {}) };
     await step("finish email", () => sql()`update import_sources set ${sql()(patch)} where id = ${source.id as string}`);
@@ -775,4 +792,12 @@ export async function finishListservRun(run: { id: string; since: string }): Pro
     await sql()`update import_runs set finished_at = now(), ok = false, summary = ${e instanceof Error ? e.message : String(e)} where id = ${run.id}`;
     throw e;
   }
+}
+
+// Retry a specific email using its original source row and fresh InboxEngine data.
+export async function readEmailSource(sourceId: string, messageId: string): Promise<void> {
+  const message = await engine()<EngineMessage>(`/v1/messages/${encodeURIComponent(messageId)}`);
+  const candidate = bodySaleCandidate(message);
+  if (!candidate.ok) throw new Error("This email no longer has sale photos that can be imported.");
+  await importEmailSale(message, candidate.photos, sourceId);
 }

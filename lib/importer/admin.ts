@@ -79,7 +79,7 @@ const toSource = (r: Row): ImportSource => ({
 
 /* Decks newest first, each with the listings still waiting for review. */
 export async function reviewQueue(): Promise<{ source: ImportSource; items: QueueItem[] }[]> {
-  const sources = await step("load decks", () => sql()<Row[]>`select * from import_sources order by created_at desc limit 100`);
+  const sources = await step("load decks", () => sql()<Row[]>`select * from import_sources where dismissed_at is null and submitted_by is null order by created_at desc limit 100`);
   const listings = await step("load review queue", () => sql()<Row[]>`
     select id, import_source_id, import_slide, title, price_cents, size, section, sub, condition, description, photo_paths, status
     from listings where status = 'review' and import_source_id is not null order by import_slide`);

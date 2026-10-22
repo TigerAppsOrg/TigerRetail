@@ -1,6 +1,6 @@
 "use client";
 import { useActionState } from "react";
-import { importLinkAction, inviteAction, runNowAction, type ImportState } from "../actions";
+import { importLinkAction, inviteAction, sourceAction, runNowAction, type ImportState } from "../actions";
 
 export function ImportForms({ engineConfigured }: { engineConfigured: boolean }) {
   const [linkState, linkAction, linkPending] = useActionState<ImportState, FormData>(importLinkAction, undefined);
@@ -60,6 +60,24 @@ export function InviteButton({ sourceId, invited }: { sourceId: string; invited:
         </span>
       )}
       {state?.error && <span className="err">{state.error}</span>}
+    </form>
+  );
+}
+
+export function SourceButton({ sourceId, decision, disabled = false }: { sourceId: string; decision: "done" | "retry"; disabled?: boolean }) {
+  const [state, action, pending] = useActionState<ImportState, FormData>(sourceAction, undefined);
+  return (
+    <form action={action} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      <input type="hidden" name="sourceId" value={sourceId} />
+      <input type="hidden" name="decision" value={decision} />
+      <button className="btn btn-outline" disabled={disabled || pending}
+        title={decision === "done" ? (disabled ? "Approve or reject the remaining items first" : "Clear this completed import from the queue") : "Retry this failed import"}
+        style={{ padding: "6px 14px" }}>
+        {pending ? (decision === "done" ? "clearing…" : "starting…") : decision}
+      </button>
+      {disabled && <span className="sub">review items first</span>}
+      {state?.message && <span role="status" className="note">{state.message}</span>}
+      {state?.error && <span role="alert" className="err">{state.error}</span>}
     </form>
   );
 }
